@@ -2,6 +2,7 @@
   "name": "app-financeiro",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
@@ -17,6 +18,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
+    "@prisma/client": "^6.15.0",
+    "@prisma/extension-accelerate": "^2.0.2",
     "next": "15.5.2",
     "next-auth": "^5.0.0-beta.29",
     "react": "19.1.1",
@@ -33,7 +36,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.2",
+    "prisma": "^6.15.0",
     "tailwindcss": "^4",
+    "tsx": "^4.20.5",
     "typescript": "^5",
     "typescript-eslint": "^8.42.0"
   }
