@@ -70,14 +70,25 @@ Copie o arquivo `.default.env` para `.env.local`:
 cp .default.env .env.local
 ```
 
-Configure as seguintes variáveis no `.env.local`:
+**Gere a chave secreta de autenticação:**
+
+```bash
+npx auth secret
+```
+
+Este comando irá:
+- Gerar uma chave secreta criptograficamente segura
+- Adicionar automaticamente `AUTH_SECRET` ao seu arquivo `.env.local`
+- Respeitar as convenções do Next.js (usando `.env.local`)
+
+Configure as demais variáveis no `.env.local`:
 
 ```env
 # Banco de Dados
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/app_financeiro"
 
-# Autenticação
-AUTH_SECRET="sua-chave-secreta-muito-segura-aqui"
+# Autenticação (já gerada pelo comando acima)
+AUTH_SECRET="[gerada automaticamente]"
 AUTH_TRUST_HOST=true
 
 # Aplicação
@@ -88,6 +99,8 @@ APP_PORT=3001
 NEXT_PUBLIC_API_BASE_URL="/api"
 NEXT_PUBLIC_APP_SUBFOLDER=""
 ```
+
+> 💡 **Dica**: A variável `AUTH_SECRET` é obrigatória e é usada pelo Auth.js para criptografar tokens e hashes de verificação de email. Nunca compartilhe esta chave ou a commitee no repositório.
 
 ### 4. Configure o banco de dados
 
