@@ -49,7 +49,7 @@ Este projeto será desenvolvido em múltiplos MVPs, começando com um controle p
 
 ### 1. Clone o repositório
 ```bash
-git clone [URL_DO_REPOSITORIO]
+git clone https://github.com/TeamSorcerers/app-financeiro.git
 cd app-financeiro
 ```
 
