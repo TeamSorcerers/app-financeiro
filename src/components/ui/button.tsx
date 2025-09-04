@@ -16,7 +16,7 @@ export default function Button ({ children, type, className, isDisabled, onClick
     <button
       type={type}
       className={`
-        rounded-md
+        rounded-lg
         bg-[#4592D7]
         cursor-pointer
         ${className}
