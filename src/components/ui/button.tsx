@@ -1,9 +1,7 @@
-import type { ButtonHTMLAttributes } from "react";
-
 export interface ButtonProps {
   children: React.ReactNode;
 
-  type?: ButtonHTMLAttributes<HTMLButtonElement>["type"];
+  type?: React.ButtonHTMLAttributes<HTMLButtonElement>["type"];
 
   className?: string;
   isDisabled?: boolean;

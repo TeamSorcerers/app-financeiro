@@ -40,6 +40,7 @@ const eslintConfig = [
       camelcase: "off",
       // disable new-cap rule
       "new-cap": "off",
+      "no-undefined": "off",
     },
   },
 ];
