@@ -1,10 +1,12 @@
 import logger from "@/lib/server/logger";
+import socket from "@/lib/server/socket";
 import next from "next";
 import { readFile } from "node:fs/promises";
 import { createServer as createHttpServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { dirname, join } from "node:path";
 import { fileURLToPath, parse } from "node:url";
+import { Server as SocketIOServer } from "socket.io";
 
 const __workingDirName = dirname(fileURLToPath(import.meta.url));
 
@@ -51,6 +53,9 @@ async function startServer () {
 
 try {
   const server = await startServer();
+
+  logger.info("Iniciando servidor Socket.IO");
+  socket.set(new SocketIOServer(server));
 
   server.listen(port, "0.0.0.0", () => {
     logger.info(`Servidor rodando em http${useSSL ? "s" : ""}://localhost:${port}`);
