@@ -18,6 +18,7 @@ export default function Button ({ children, type, className, isDisabled, onClick
       className={`
         rounded-lg
         bg-[#4592D7]
+        text-[#D3D3D3]
         cursor-pointer
         ${className}
       `}
