@@ -1,3 +1,5 @@
+"use client";
+
 import useInternalServerEvents from "@/lib/client/events";
 import { createContext, useContext } from "react";
 
