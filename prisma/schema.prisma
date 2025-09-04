@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,4 +5,94 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model User {
+  id Int @id @default(autoincrement())
+
+  email String @unique @db.VarChar(254)
+  name String @db.VarChar(100)
+  password String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groups FinancialGroup[]
+  groupMembers FinancialGroupMember[]
+
+  transactions Transaction[]
+}
+
+model FinancialGroup {
+  id Int @id @default(autoincrement())
+
+  name String @db.VarChar(100)
+  description String @db.VarChar(150)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdBy User @relation(fields: [createdById], references: [id])
+  createdById Int
+
+  members FinancialGroupMember[]
+  transactions Transaction[]
+}
+
+model FinancialGroupMember {
+  id Int @id @default(autoincrement())
+
+  user User @relation(fields: [userId], references: [id])
+  userId Int
+
+  financialGroup FinancialGroup @relation(fields: [financialGroupId], references: [id])
+  financialGroupId Int
+
+  joinedAt DateTime @default(now())
+
+  isOwner Boolean @default(false)
+
+  balance Float @default(0)
+
+  @@unique([userId, financialGroupId])
+}
+
+model FinancialCategory {
+  id Int @id @default(autoincrement())
+
+  name String @db.VarChar(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
+model Transaction {
+  id Int @id @default(autoincrement())
+
+  amount Float
+  type TransactionType
+
+  description String? @db.VarChar(255)
+
+  date DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  transactionDate DateTime
+
+  createdBy User @relation(fields: [createdById], references: [id])
+  createdById Int
+
+  group FinancialGroup @relation(fields: [groupId], references: [id])
+  groupId Int
+
+  category FinancialCategory? @relation(fields: [categoryId], references: [id])
+  categoryId Int?
 }
