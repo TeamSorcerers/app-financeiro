@@ -1,7 +1,7 @@
 import { useIo } from "@/lib/client/socket";
 import { ServerEvents } from "@/lib/shared/events";
 
-export default function useServerEvents () {
+export default function useInternalServerEvents () {
   const io = useIo();
 
   const on = <EventName extends keyof ServerEvents, Callback extends ServerEvents[EventName]>(eventName: EventName, callback: Callback) => {

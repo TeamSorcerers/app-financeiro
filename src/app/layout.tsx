@@ -1,4 +1,5 @@
 import "@/assets/css/globals.css";
+import { ServerEventsProvider } from "@/context/events";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
@@ -23,7 +24,9 @@ export default function RootLayout ({ children }: Readonly<{children: React.Reac
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <ServerEventsProvider>
+          {children}
+        </ServerEventsProvider>
       </body>
     </html>
   );
