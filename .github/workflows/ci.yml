@@ -1,0 +1,156 @@
+# Workflow de Integração Contínua para validação de código
+#
+# Executa verificações de qualidade de código e build após cada commit
+#
+name: CI - Validação de Código
+
+on:
+  # Executa em pushes para as branches principais
+  push:
+    branches: ["main", "master", "develop"]
+  
+  # Executa em pull requests direcionados às branches principais
+  pull_request:
+    branches: ["main", "master", "develop"]
+  
+  # Permite executar manualmente
+  workflow_dispatch:
+
+# Cancela execuções anteriores se um novo commit for feito
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job de validação de código
+  validate:
+    name: Validação de Código
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+      
+      - name: Configurar Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Instalar dependências
+        run: npm ci
+      
+      - name: Verificar tipos TypeScript
+        run: npm run type-check
+      
+      - name: Executar ESLint
+        run: npm run lint
+      
+      - name: Gerar cliente Prisma
+        run: npm run db:generate
+      
+      - name: Verificar build do Next.js
+        run: npm run build
+        env:
+          # Variáveis necessárias para o build
+          DATABASE_URL: "postgresql://test:test@localhost:5432/test_db"
+          AUTH_SECRET: "test-secret-for-ci-only-not-for-production"
+          AUTH_TRUST_HOST: true
+          APP_ENV: "development"
+          NEXT_PUBLIC_API_BASE_URL: "/api"
+          NEXT_PUBLIC_APP_SUBFOLDER: ""
+      
+      - name: Verificar se existem arquivos não commitados
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "❌ Existem arquivos modificados que não foram commitados:"
+            git status --porcelain
+            exit 1
+          else
+            echo "✅ Nenhum arquivo foi modificado durante o build"
+          fi
+
+  # Job de análise de dependências
+  security:
+    name: Análise de Segurança
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+      
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Instalar dependências
+        run: npm ci
+      
+      - name: Auditoria de segurança
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+      
+      - name: Verificar dependências desatualizadas
+        run: npm outdated
+        continue-on-error: true
+
+  # Job de verificação do schema Prisma
+  database:
+    name: Validação do Banco de Dados
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+      
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Instalar dependências
+        run: npm ci
+      
+      - name: Validar schema Prisma
+        run: npx prisma validate
+      
+      - name: Verificar formato do schema
+        run: npx prisma format --check
+        continue-on-error: true
+      
+      - name: Gerar cliente Prisma
+        run: npm run db:generate
+
+  # Resumo dos resultados
+  ci-summary:
+    name: Resumo da CI
+    runs-on: ubuntu-latest
+    needs: [validate, security, database]
+    if: always()
+    
+    steps:
+      - name: Verificar resultados
+        run: |
+          echo "📊 Resumo da Integração Contínua:"
+          echo "✅ Validação de código: ${{ needs.validate.result }}"
+          echo "🔒 Análise de segurança: ${{ needs.security.result }}"
+          echo "🗄️ Validação do banco: ${{ needs.database.result }}"
+          
+          if [[ "${{ needs.validate.result }}" == "failure" ]]; then
+            echo "❌ Falha na validação de código"
+            exit 1
+          fi
+          
+          if [[ "${{ needs.database.result }}" == "failure" ]]; then
+            echo "❌ Falha na validação do banco"
+            exit 1
+          fi
+          
+          echo "🎉 Todas as verificações principais passaram!"

@@ -1,3 +1,7 @@
+import { config } from "@dotenvx/dotenvx";
+
+config();
+
 import logger from "@/lib/server/logger";
 import socket from "@/lib/server/socket";
 import next from "next";

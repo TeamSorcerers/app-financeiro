@@ -9,6 +9,8 @@ export async function GET (
 
   // Apenas temporário - Remover depois
   logger.info(`Obtendo despesa com id: ${id}`);
+
+  return Response.json({ message: "Despesa obtida com sucesso" });
 }
 
 export async function PUT (
@@ -19,6 +21,8 @@ export async function PUT (
 
   // Apenas temporário - Remover depois
   logger.info(`Atualizando despesa com id: ${id}`);
+
+  return Response.json({ message: "Despesa atualizada com sucesso" });
 }
 
 export async function DELETE (
@@ -29,4 +33,6 @@ export async function DELETE (
 
   // Apenas temporário - Remover depois
   logger.info(`Apagando despesa com id: ${id}`);
+
+  return Response.json({ message: "Despesa apagada com sucesso" });
 }

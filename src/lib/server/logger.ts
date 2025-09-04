@@ -1,10 +1,6 @@
-import { config } from "@dotenvx/dotenvx";
 import fs from "node:fs";
 import path from "node:path";
 import pino from "pino";
-
-// Load environment variables
-config();
 
 const isDevelopment = process.env.APP_ENV === "development";
 const logLevel = process.env.LOG_LEVEL ?? "info";
