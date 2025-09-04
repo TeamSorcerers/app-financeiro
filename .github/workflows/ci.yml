@@ -120,13 +120,19 @@ jobs:
       
       - name: Validar schema Prisma
         run: npx prisma validate
+        env:
+          DATABASE_URL: "postgresql://test:test@localhost:5432/test_db"
       
       - name: Verificar formato do schema
         run: npx prisma format --check
         continue-on-error: true
+        env:
+          DATABASE_URL: "postgresql://test:test@localhost:5432/test_db"
       
       - name: Gerar cliente Prisma
         run: npm run db:generate
+        env:
+          DATABASE_URL: "postgresql://test:test@localhost:5432/test_db"
 
   # Resumo dos resultados
   ci-summary:
