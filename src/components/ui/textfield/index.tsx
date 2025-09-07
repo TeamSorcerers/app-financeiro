@@ -68,7 +68,7 @@ export default function TextField ({
             focus:ring-1
             focus:ring-[#296BA6]
             ${inputClassName}
-            ${errorContent ? "border-red-400 outline-red-400 focus:border-red-400 focus:ring-red-400" : ""}
+            ${errorContent ? "border-[#FF6B6B] outline-[#FF6B6B] focus:border-[#FF6B6B] focus:ring-[#FF6B6B]" : ""}
           `}
           placeholder={placeholder}
           required={isRequired}
@@ -89,9 +89,10 @@ export default function TextField ({
             className="
                 absolute
                 right-3
-                text-gray-500
-                hover:text-gray-400
+                text-gray-400
+                hover:text-gray-300
                 focus:outline-none
+                cursor-pointer
             "
             tabIndex={-1}
             aria-label={isPasswordVisible ? "Ocultar senha" : "Exibir senha"}
@@ -107,7 +108,7 @@ export default function TextField ({
 
       {
         errorContent &&
-        <p className="mt-1 text-base text-red-400" id={`${name}-error`}>
+        <p className="mt-1 text-base text-[#FF6B6B]" id={`${name}-error`}>
           {errorContent}
         </p>
 

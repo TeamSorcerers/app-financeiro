@@ -41,8 +41,8 @@ export default function Tooltip ({ children, icon = <HelpCircle size={14} />, ar
           role="tooltip"
           className="
             absolute
-            z-10 p-2
-            bg-[#29353D]
+            z-30 p-2
+            bg-[#3a7bbd4D]
             text-white
             text-sm
             rounded
