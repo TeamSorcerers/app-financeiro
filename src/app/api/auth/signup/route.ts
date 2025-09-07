@@ -66,6 +66,7 @@ export async function POST (req: NextRequest) {
     await signIn("credentials", {
       email: user.email,
       password: data.password,
+      redirect: false,
     });
 
     logger.info(`Usuário criado com sucesso: ${
