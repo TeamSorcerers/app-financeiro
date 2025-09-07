@@ -62,7 +62,7 @@ export default function RegisterPage () {
         }
 
         // Outros erros
-        setError("root.server", {
+        setError("root", {
           type: "server",
           message: result.error || "Erro interno do servidor",
         });
@@ -73,7 +73,7 @@ export default function RegisterPage () {
       router.push("/");
     } catch (error) {
       console.error("Erro de rede:", error);
-      setError("root.server", {
+      setError("root", {
         type: "network",
         message: "Erro de conexão. Tente novamente.",
       });
@@ -139,6 +139,14 @@ export default function RegisterPage () {
               errorContent={errors.confirmPassword?.message}
               {...register("confirmPassword")}
             />
+
+            {
+              errors.root?.message &&
+              <p className="mt-1 text-base text-[#FF6B6B] text-center" id={"root-error"}>
+                {errors.root.message}
+              </p>
+
+            }
 
             <Button
               type="submit"
