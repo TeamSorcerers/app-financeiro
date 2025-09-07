@@ -17,6 +17,7 @@ export interface TextFieldProps {
 
   placeholder?: string;
   className?: string;
+  inputClassName?: string;
 
   ref?: React.Ref<HTMLInputElement>;
 
@@ -35,6 +36,7 @@ export default function TextField ({
   isDisabled,
   placeholder,
   className,
+  inputClassName,
   ref,
   value,
   onChange,
@@ -65,7 +67,8 @@ export default function TextField ({
             outline-none
             focus:ring-1
             focus:ring-[#296BA6]
-            ${errorContent ? "border-red-400 outline-red-400" : ""}
+            ${inputClassName}
+            ${errorContent ? "border-red-400 outline-red-400 focus:border-red-400 focus:ring-red-400" : ""}
           `}
           placeholder={placeholder}
           required={isRequired}
@@ -87,7 +90,7 @@ export default function TextField ({
                 absolute
                 right-3
                 text-gray-500
-                hover:text-gray-700
+                hover:text-gray-400
                 focus:outline-none
             "
             tabIndex={-1}

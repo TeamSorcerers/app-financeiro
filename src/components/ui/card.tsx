@@ -11,7 +11,6 @@ export default function Card ({ children, className }: CardProps) {
         rounded-lg
         p-4
         shadow-md
-        bg-[#202020]
         z-40
         ${className}
       `}
