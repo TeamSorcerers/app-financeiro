@@ -1,6 +1,6 @@
 import logger from "@/lib/server/logger";
 import { signIn } from "@/lib/shared/auth";
-import { PRETTY_PRINT_INDENT } from "@/lib/shared/constants";
+import { BCRYPT_ROUNDS, HTTP_STATUS, PRETTY_PRINT_INDENT } from "@/lib/shared/constants";
 import { prisma } from "@/lib/shared/prisma";
 import { AuthRegisterSchema } from "@/lib/shared/schemas/auth";
 import { hash } from "bcryptjs";
@@ -18,7 +18,7 @@ export async function POST (req: NextRequest) {
       return Response.json({
         error: "Dados inválidos",
         details: formattedErrors,
-      }, { status: 400 });
+      }, { status: HTTP_STATUS.BAD_REQUEST });
     }
 
     // Verificar se o usuário já existe
@@ -28,11 +28,11 @@ export async function POST (req: NextRequest) {
       return Response.json({
         error: "Usuário já existe",
         details: { email: [ "Este e-mail já está em uso" ] },
-      }, { status: 409 });
+      }, { status: HTTP_STATUS.CONFLICT });
     }
 
     // Hash da senha
-    const hashedPassword = await hash(data.password, Number(process.env.BCRYPT_ROUNDS));
+    const hashedPassword = await hash(data.password, BCRYPT_ROUNDS);
 
     // Criar usuário
     const user = await prisma.user.create({
@@ -46,6 +46,20 @@ export async function POST (req: NextRequest) {
         name: true,
         email: true,
         createdAt: true,
+      },
+    });
+
+    await prisma.financialGroup.create({
+      data: {
+        name: "Pessoal",
+        description: "Grupo financeiro pessoal",
+        members: {
+          create: {
+            userId: user.id,
+            isOwner: true,
+          },
+        },
+        createdBy: { connect: { id: user.id } },
       },
     });
 
@@ -69,10 +83,10 @@ export async function POST (req: NextRequest) {
     return Response.json({
       message: "Usuário criado com sucesso",
       user,
-    }, { status: 201 });
+    }, { status: HTTP_STATUS.CREATED });
   } catch (error) {
     logger.error(error, "Erro ao registrar usuário");
 
-    return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
+    return Response.json({ error: "Erro interno do servidor" }, { status: HTTP_STATUS.INTERNAL_SERVER_ERROR });
   }
 }

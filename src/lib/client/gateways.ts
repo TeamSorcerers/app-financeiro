@@ -23,4 +23,11 @@ export default Object.freeze({
     return `${this.ROOT()}/auth`;
   },
 
+  /**
+   * [POST] /auth/signup
+   * @returns {string} A URL base para cadastro.
+   */
+  SIGNUP () {
+    return `${this.AUTH()}/signup`;
+  },
 });
