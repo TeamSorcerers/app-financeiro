@@ -5,13 +5,13 @@ import { TransactionUpdateSchema } from "@/lib/shared/schemas/transaction";
 import { RouteParams } from "@/lib/shared/types";
 import { NextRequest } from "next/server";
 
-export async function GET(
+export async function GET (
   request: NextRequest,
   { params }: RouteParams<{ id: string }>,
 ) {
   try {
     const session = await auth();
-    
+
     if (!session?.user?.id) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
@@ -48,20 +48,20 @@ export async function GET(
     logger.info(`Obtendo transação com id: ${id} para usuário ${session.user.id}`);
 
     return Response.json({ data: transaction });
-
   } catch (error) {
     logger.error(error, "Erro ao obter transação");
+
     return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }
 
-export async function PUT(
+export async function PUT (
   request: NextRequest,
   { params }: RouteParams<{ id: string }>,
 ) {
   try {
     const session = await auth();
-    
+
     if (!session?.user?.id) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
@@ -89,9 +89,9 @@ export async function PUT(
     const { success, data, error } = await TransactionUpdateSchema.safeParseAsync(body);
 
     if (!success) {
-      return Response.json({ 
-        error: "Dados inválidos", 
-        details: error.issues 
+      return Response.json({
+        error: "Dados inválidos",
+        details: error.issues,
       }, { status: 400 });
     }
 
@@ -105,33 +105,39 @@ export async function PUT(
       });
 
       if (!groupMember) {
-        return Response.json({ 
-          error: "Acesso negado ao grupo financeiro" 
-        }, { status: 403 });
+        return Response.json({ error: "Acesso negado ao grupo financeiro" }, { status: 403 });
       }
     }
 
     // Verificar se a categoria existe (se categoryId foi fornecida)
     if (data.categoryId) {
-      const category = await prisma.financialCategory.findUnique({
-        where: { id: data.categoryId },
-      });
+      const category = await prisma.financialCategory.findUnique({ where: { id: data.categoryId } });
 
       if (!category) {
-        return Response.json({ 
-          error: "Categoria não encontrada" 
-        }, { status: 404 });
+        return Response.json({ error: "Categoria não encontrada" }, { status: 404 });
       }
     }
 
     const updateData: any = {};
-    
-    if (data.amount !== undefined) updateData.amount = data.amount;
-    if (data.type !== undefined) updateData.type = data.type;
-    if (data.description !== undefined) updateData.description = data.description;
-    if (data.transactionDate !== undefined) updateData.transactionDate = new Date(data.transactionDate);
-    if (data.groupId !== undefined) updateData.groupId = data.groupId;
-    if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+
+    if (data.amount !== undefined) {
+      updateData.amount = data.amount;
+    }
+    if (data.type !== undefined) {
+      updateData.type = data.type;
+    }
+    if (data.description !== undefined) {
+      updateData.description = data.description;
+    }
+    if (data.transactionDate !== undefined) {
+      updateData.transactionDate = new Date(data.transactionDate);
+    }
+    if (data.groupId !== undefined) {
+      updateData.groupId = data.groupId;
+    }
+    if (data.categoryId !== undefined) {
+      updateData.categoryId = data.categoryId;
+    }
 
     const transaction = await prisma.transaction.update({
       where: { id: transactionId },
@@ -151,24 +157,24 @@ export async function PUT(
 
     logger.info(`Transação atualizada com sucesso com id: ${id} para usuário ${session.user.id}`);
 
-    return Response.json({ 
+    return Response.json({
       data: transaction,
-      message: "Transação atualizada com sucesso" 
+      message: "Transação atualizada com sucesso",
     });
-
   } catch (error) {
     logger.error(error, "Erro ao atualizar transação");
+
     return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }
 
-export async function DELETE(
+export async function DELETE (
   request: NextRequest,
   { params }: RouteParams<{ id: string }>,
 ) {
   try {
     const session = await auth();
-    
+
     if (!session?.user?.id) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
@@ -192,16 +198,14 @@ export async function DELETE(
       return Response.json({ error: "Transação não encontrada" }, { status: 404 });
     }
 
-    await prisma.transaction.delete({
-      where: { id: transactionId },
-    });
+    await prisma.transaction.delete({ where: { id: transactionId } });
 
     logger.info(`Transação apagada com sucesso com id: ${id} para usuário ${session.user.id}`);
 
     return Response.json({ message: "Transação apagada com sucesso" });
-
   } catch (error) {
     logger.error(error, "Erro ao apagar transação");
+
     return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }

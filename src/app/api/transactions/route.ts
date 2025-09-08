@@ -4,10 +4,10 @@ import { prisma } from "@/lib/shared/prisma";
 import { TransactionSchema } from "@/lib/shared/schemas/transaction";
 import { NextRequest } from "next/server";
 
-export async function GET(request: NextRequest) {
+export async function GET (request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user?.id) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
@@ -46,28 +46,26 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: {
-        transactionDate: "desc",
-      },
+      orderBy: { transactionDate: "desc" },
     });
 
     logger.info(`Obtendo ${transactions.length} transações para usuário ${session.user.id}`);
 
-    return Response.json({ 
+    return Response.json({
       data: transactions,
-      count: transactions.length 
+      count: transactions.length,
     });
-
   } catch (error) {
     logger.error(error, "Erro ao obter transações");
+
     return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST (request: NextRequest) {
   try {
     const session = await auth();
-    
+
     if (!session?.user?.id) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
@@ -76,9 +74,9 @@ export async function POST(request: NextRequest) {
     const { success, data, error } = await TransactionSchema.safeParseAsync(body);
 
     if (!success) {
-      return Response.json({ 
-        error: "Dados inválidos", 
-        details: error.issues 
+      return Response.json({
+        error: "Dados inválidos",
+        details: error.issues,
       }, { status: 400 });
     }
 
@@ -91,21 +89,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (!groupMember) {
-      return Response.json({ 
-        error: "Acesso negado ao grupo financeiro" 
-      }, { status: 403 });
+      return Response.json({ error: "Acesso negado ao grupo financeiro" }, { status: 403 });
     }
 
     // Verificar se a categoria existe (se fornecida)
     if (data.categoryId) {
-      const category = await prisma.financialCategory.findUnique({
-        where: { id: data.categoryId },
-      });
+      const category = await prisma.financialCategory.findUnique({ where: { id: data.categoryId } });
 
       if (!category) {
-        return Response.json({ 
-          error: "Categoria não encontrada" 
-        }, { status: 404 });
+        return Response.json({ error: "Categoria não encontrada" }, { status: 404 });
       }
     }
 
@@ -134,13 +126,13 @@ export async function POST(request: NextRequest) {
 
     logger.info(`Transação criada com sucesso para usuário ${session.user.id}`);
 
-    return Response.json({ 
+    return Response.json({
       data: transaction,
-      message: "Transação criada com sucesso" 
+      message: "Transação criada com sucesso",
     }, { status: 201 });
-
   } catch (error) {
     logger.error(error, "Erro ao criar transação");
+
     return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 }

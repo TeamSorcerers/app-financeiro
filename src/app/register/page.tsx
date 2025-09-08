@@ -11,8 +11,8 @@ import { useForm } from "react-hook-form";
 export default function RegisterPage () {
   const {
     register,
-    handleSubmit,
-    setError,
+    handleSubmit: _handleSubmit,
+    setError: _setError,
     formState: { errors, isSubmitting },
   } = useForm<AuthRegisterSchemaData>({
     resolver: zodResolver(AuthRegisterSchema),
