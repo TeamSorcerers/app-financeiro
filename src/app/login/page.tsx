@@ -6,6 +6,8 @@ import Divider from "@/components/ui/divider";
 import TextField from "@/components/ui/textfield";
 import { AuthLoginSchema, AuthLoginSchemaData } from "@/lib/shared/schemas/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { signIn } from "next-auth/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 
 export default function LoginPage () {
@@ -19,6 +21,40 @@ export default function LoginPage () {
     mode: "onChange",
   });
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const onSubmit = async (data: AuthLoginSchemaData) => {
+    try {
+      const result = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("root", {
+          type: "server",
+          message: "E-mail ou senha incorretos",
+        });
+
+        return;
+      }
+
+      // Login bem-sucedido - redirecionar
+      const redirectTo = searchParams.get("redirect") || "/";
+
+      router.push(redirectTo);
+      router.refresh();
+    } catch (error) {
+      console.error("Erro no login:", error);
+      setError("root", {
+        type: "network",
+        message: "Erro de conexão. Tente novamente.",
+      });
+    }
+  };
+
   return (
     <div className="w-full h-screen flex flex-col items-center justify-center bg-[#3c3c3c] px-4">
       <Card className="w-full max-w-xl lg:max-w-2xl bg-[#4A4A4A] rounded-lg border-t-4 border-t-[#3A7BBD] shadow-lg overflow-hidden">
@@ -30,7 +66,7 @@ export default function LoginPage () {
             Entre com suas credenciais para acessar o sistema
           </p>
 
-          <form className="w-full mx-auto flex flex-col space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="w-full mx-auto flex flex-col space-y-5">
             <TextField
               type="email"
               label="E-mail"
@@ -53,6 +89,13 @@ export default function LoginPage () {
               errorContent={errors.password?.message}
               {...register("password")}
             />
+
+            {
+              errors.root?.message &&
+              <p className="mt-1 text-base text-[#FF6B6B] text-center" id={"root-error"}>
+                {errors.root.message}
+              </p>
+            }
 
             <Button
               type="submit"

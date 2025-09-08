@@ -145,7 +145,6 @@ export default function RegisterPage () {
               <p className="mt-1 text-base text-[#FF6B6B] text-center" id={"root-error"}>
                 {errors.root.message}
               </p>
-
             }
 
             <Button
