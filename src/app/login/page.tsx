@@ -13,8 +13,8 @@ import { useForm } from "react-hook-form";
 export default function LoginPage () {
   const {
     register,
-    handleSubmit: _handleSubmit,
-    setError: _setError,
+    handleSubmit,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<AuthLoginSchemaData>({
     resolver: zodResolver(AuthLoginSchema),
