@@ -3,8 +3,8 @@
 import Button from "@/components/ui/button";
 import Card from "@/components/ui/card";
 import Divider from "@/components/ui/divider";
-import { ArrowDown, ArrowUp, Plus, User } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { ArrowDown, ArrowUp, LogOut, Plus, User } from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
 
 // Mock de dados do usuário e transações
 const mockUser = {
@@ -67,7 +67,7 @@ const mockTransactions = [
 ];
 
 export default function Home () {
-  const { status, data: session } = useSession();
+  const { status: sessionStatus, data: session } = useSession();
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -80,8 +80,12 @@ export default function Home () {
     year: "numeric",
   });
 
+  const onLogout = async () => {
+    await signOut({ callbackUrl: "/login" });
+  };
+
   // Estados de carregamento e não autenticado
-  if (status === "loading") {
+  if (sessionStatus === "loading") {
     return (
       <div className="min-h-screen bg-[#3c3c3c] flex items-center justify-center">
         <div className="text-[#d3d3d3] text-lg">Carregando...</div>
@@ -89,7 +93,7 @@ export default function Home () {
     );
   }
 
-  if (status === "unauthenticated") {
+  if (sessionStatus === "unauthenticated") {
     return (
       <div className="min-h-screen bg-[#3c3c3c] flex items-center justify-center">
         <div className="text-[#d3d3d3] text-lg">Redirecionando...</div>
@@ -107,8 +111,8 @@ export default function Home () {
         {/* Header com informações do usuário */}
         <Card className="bg-[#4A4A4A] rounded-lg border-t-4 border-t-[#296BA6] shadow-lg overflow-hidden">
           <div className="p-4 md:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center space-x-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center space-x-4 flex-1 min-w-0">
                 <div className="w-16 h-16 bg-[#555555] rounded-full flex items-center justify-center border-2 border-[#296BA6] flex-shrink-0">
                   <User size={32} className="text-[#d3d3d3]" />
                 </div>
@@ -122,17 +126,26 @@ export default function Home () {
                 </div>
               </div>
 
-              <div className="text-left sm:text-right flex-shrink-0">
-                <p className="text-[#d3d3d3] text-sm opacity-80 mb-1">Saldo atual</p>
-                <p className={`text-xl md:text-2xl font-bold ${userBalance >= 0 ? "text-[#5AA4E6]" : "text-[#FF6B6B]"}`}>
-                  {formatCurrency(userBalance)}
-                </p>
+              <div className="flex flex-col items-end gap-3 flex-shrink-0">
+                <button
+                  onClick={onLogout}
+                  className="text-[#d3d3d3] hover:text-[#FF6B6B] transition-colors duration-200 flex items-center gap-1.5 text-xs opacity-60 hover:opacity-100 p-1 rounded"
+                  title="Sair da conta"
+                >
+                  <LogOut size={14} />
+                  <span>Sair</span>
+                </button>
+
+                <div className="text-right">
+                  <p className="text-[#d3d3d3] text-sm opacity-80 mb-1">Saldo atual</p>
+                  <p className={`text-xl md:text-2xl font-bold ${userBalance >= 0 ? "text-[#5AA4E6]" : "text-[#FF6B6B]"}`}>
+                    {formatCurrency(userBalance)}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </Card>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        </Card>        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Botão de nova transação */}
           <Card className="bg-[#4A4A4A] rounded-lg border-t-2 border-t-[#5AA4E6] shadow-lg overflow-hidden">
             <div className="p-6 text-center">
