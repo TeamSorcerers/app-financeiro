@@ -4,8 +4,11 @@ import Button from "@/components/ui/button";
 import Card from "@/components/ui/card";
 import Divider from "@/components/ui/divider";
 import TextField from "@/components/ui/textfield";
+import gateways from "@/lib/client/gateways";
+import { HTTP_STATUS } from "@/lib/shared/constants";
 import { AuthRegisterSchema, AuthRegisterSchemaData } from "@/lib/shared/schemas/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 
 export default function RegisterPage () {
@@ -19,6 +22,64 @@ export default function RegisterPage () {
     mode: "onChange",
   });
 
+  const router = useRouter();
+
+  const onSubmit = async (data: AuthRegisterSchemaData) => {
+    try {
+      const response = await fetch(gateways.SIGNUP(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (response.status === HTTP_STATUS.BAD_REQUEST) {
+          // Tratar erros de validação
+          if (result.details) {
+            for (const [ field, message ] of Object.entries(result.details)) {
+              setError(field as keyof AuthRegisterSchemaData, {
+                type: "server",
+                message: Array.isArray(message) ? message[0] : String(message),
+              });
+            }
+          }
+
+          return;
+        }
+
+        if (response.status === HTTP_STATUS.CONFLICT) {
+          // Tratar erro de e-mail já existente
+          if (result.details?.email) {
+            setError("email", {
+              type: "server",
+              message: Array.isArray(result.details.email) ? result.details.email[0] : result.details.email,
+            });
+          }
+
+          return;
+        }
+
+        // Outros erros
+        setError("root", {
+          type: "server",
+          message: result.error || "Erro interno do servidor",
+        });
+
+        return;
+      }
+
+      router.push("/");
+    } catch (error) {
+      console.error("Erro de rede:", error);
+      setError("root", {
+        type: "network",
+        message: "Erro de conexão. Tente novamente.",
+      });
+    }
+  };
+
   return (
     <div className="w-full h-screen flex flex-col items-center justify-center bg-[#3c3c3c] px-4">
       <Card className="w-full max-w-xl lg:max-w-2xl bg-[#4A4A4A] rounded-lg border-t-4 border-t-[#3A7BBD] shadow-lg overflow-hidden">
@@ -30,7 +91,7 @@ export default function RegisterPage () {
             Preencha os campos abaixo para criar sua conta
           </p>
 
-          <form className="w-full mx-auto flex flex-col space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="w-full mx-auto flex flex-col space-y-5">
             <TextField
               type="text"
               label="Nome completo"
@@ -78,6 +139,13 @@ export default function RegisterPage () {
               errorContent={errors.confirmPassword?.message}
               {...register("confirmPassword")}
             />
+
+            {
+              errors.root?.message &&
+              <p className="mt-1 text-base text-[#FF6B6B] text-center" id={"root-error"}>
+                {errors.root.message}
+              </p>
+            }
 
             <Button
               type="submit"

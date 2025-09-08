@@ -4,6 +4,13 @@ import { prisma } from "@/lib/shared/prisma";
 import { TransactionSchema } from "@/lib/shared/schemas/transaction";
 import { NextRequest } from "next/server";
 
+interface TransactionWhere {
+  createdById: number;
+  groupId?: number;
+  type?: "INCOME" | "EXPENSE";
+  categoryId?: number;
+}
+
 export async function GET (request: NextRequest) {
   try {
     const session = await auth();
@@ -17,9 +24,7 @@ export async function GET (request: NextRequest) {
     const type = searchParams.get("type");
     const categoryId = searchParams.get("categoryId");
 
-    const where: any = {
-      createdById: session.user.id,
-    };
+    const where: TransactionWhere = { createdById: session.user.id };
 
     if (groupId) {
       where.groupId = Number(groupId);

@@ -5,6 +5,15 @@ import { TransactionUpdateSchema } from "@/lib/shared/schemas/transaction";
 import { RouteParams } from "@/lib/shared/types";
 import { NextRequest } from "next/server";
 
+interface TransactionUpdateData {
+  amount?: number;
+  type?: "INCOME" | "EXPENSE";
+  description?: string;
+  transactionDate?: Date;
+  groupId?: number;
+  categoryId?: number;
+}
+
 export async function GET (
   request: NextRequest,
   { params }: RouteParams<{ id: string }>,
@@ -118,7 +127,7 @@ export async function PUT (
       }
     }
 
-    const updateData: any = {};
+    const updateData: TransactionUpdateData = {};
 
     if (data.amount !== undefined) {
       updateData.amount = data.amount;

@@ -1,6 +1,7 @@
 import "@/assets/css/globals.css";
 import { ServerEventsProvider } from "@/context/events";
 import type { Metadata } from "next";
+import { SessionProvider } from "next-auth/react";
 import { Geist, Geist_Mono, Raleway } from "next/font/google";
 
 const raleway = Raleway({
@@ -29,9 +30,11 @@ export default function RootLayout ({ children }: Readonly<{children: React.Reac
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${raleway.variable} antialiased`}
       >
-        <ServerEventsProvider>
-          {children}
-        </ServerEventsProvider>
+        <SessionProvider>
+          <ServerEventsProvider>
+            {children}
+          </ServerEventsProvider>
+        </SessionProvider>
       </body>
     </html>
   );
