@@ -30,4 +30,16 @@ export default Object.freeze({
   SIGNUP () {
     return `${this.AUTH()}/signup`;
   },
+
+  GET_ALL_TRANSACTIONS () {
+    return `${this.ROOT()}/transactions`;
+  },
+
+  /**
+   * [POST] /transactions
+   * @returns {string} A URL base para criar uma nova transação.
+   */
+  CREATE_TRANSACTION () {
+    return this.GET_ALL_TRANSACTIONS();
+  },
 });

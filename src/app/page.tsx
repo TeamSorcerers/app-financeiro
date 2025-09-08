@@ -3,8 +3,16 @@
 import Button from "@/components/ui/button";
 import Card from "@/components/ui/card";
 import Divider from "@/components/ui/divider";
+import Modal from "@/components/ui/modal";
+import TextField from "@/components/ui/textfield";
+import gateways from "@/lib/client/gateways";
+import { HTTP_STATUS } from "@/lib/shared/constants";
+import { TransactionSchema, TransactionSchemaData } from "@/lib/shared/schemas/transaction";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowUp, LogOut, Plus, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 // Mock de dados do usuário e transações
 const mockUser = {
@@ -68,6 +76,22 @@ const mockTransactions = [
 
 export default function Home () {
   const { status: sessionStatus, data: session } = useSession();
+  const [ isModalOpen, setIsModalOpen ] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<TransactionSchemaData>({
+    resolver: zodResolver(TransactionSchema),
+    mode: "onChange",
+    defaultValues: {
+      type: "EXPENSE",
+      transactionDate: new Date().toISOString(),
+    },
+  });
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -82,6 +106,58 @@ export default function Home () {
 
   const onLogout = async () => {
     await signOut({ callbackUrl: "/login" });
+  };
+
+  const openModal = () => {
+    setIsModalOpen(true);
+    reset();
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    reset();
+  };
+
+  const onSubmitTransaction = async (data: TransactionSchemaData) => {
+    try {
+      const response = await fetch(gateways.CREATE_TRANSACTION(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (response.status === HTTP_STATUS.BAD_REQUEST) {
+          setError("root", {
+            type: "server",
+            message: result.error || "Dados inválidos",
+          });
+
+          return;
+        }
+
+        setError("root", {
+          type: "server",
+          message: result.error || "Erro interno do servidor",
+        });
+
+        return;
+      }
+
+      // Sucesso - fechar modal e limpar form
+      closeModal();
+      console.log("Transação criada com sucesso:", result);
+
+      // TODO: Atualizar lista de transações
+    } catch (error) {
+      console.error("Erro de rede:", error);
+      setError("root", {
+        type: "network",
+        message: "Erro de conexão. Tente novamente.",
+      });
+    }
   };
 
   // Estados de carregamento e não autenticado
@@ -158,7 +234,10 @@ export default function Home () {
               <p className="text-[#d3d3d3] opacity-80 text-sm mb-4">
                 Adicione uma receita ou despesa
               </p>
-              <Button className="w-full bg-[#4592D7] py-2 hover:bg-[#5AA4E6] text-white font-medium rounded-md transition-colors duration-200">
+              <Button
+                onClick={openModal}
+                className="w-full bg-[#4592D7] py-2 hover:bg-[#5AA4E6] text-white font-medium rounded-md transition-colors duration-200"
+              >
                 Adicionar
               </Button>
             </div>
@@ -268,6 +347,105 @@ export default function Home () {
           </div>
         </Card>
       </div>
+
+      {/* Modal de Nova Transação */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        title="Nova Transação"
+      >
+        <form onSubmit={handleSubmit(onSubmitTransaction)} className="space-y-4">
+          {errors.root?.message &&
+            <div className="bg-[#FF6B6B] bg-opacity-10 border border-[#FF6B6B] text-[#FF6B6B] px-4 py-3 rounded-md text-sm text-center">
+              {errors.root.message}
+            </div>
+          }
+
+          {/* Tipo de Transação */}
+          <div>
+            <label className="block text-[#d3d3d3] text-sm font-medium mb-2">
+              Tipo de Transação
+            </label>
+            <div className="flex gap-3">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  value="INCOME"
+                  className="sr-only"
+                  {...register("type")}
+                />
+                <div className="flex items-center gap-2 px-4 py-2 rounded-md bg-[#555555] text-[#d3d3d3] hover:bg-[#5AA4E6] hover:text-white transition-colors">
+                  <ArrowUp size={16} />
+                  <span>Receita</span>
+                </div>
+              </label>
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  value="EXPENSE"
+                  className="sr-only"
+                  {...register("type")}
+                />
+                <div className="flex items-center gap-2 px-4 py-2 rounded-md bg-[#555555] text-[#d3d3d3] hover:bg-[#FF6B6B] hover:text-white transition-colors">
+                  <ArrowDown size={16} />
+                  <span>Despesa</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <TextField
+            type="number"
+            label="Valor"
+            placeholder="0,00"
+            className="w-full"
+            inputClassName="bg-[#555555] border-[#555555] text-[#d3d3d3] placeholder:text-[#999999] focus:border-[#296BA6] focus:ring-1 focus:ring-[#296BA6] transition-colors"
+            tooltipContent="Valor da transação em reais"
+            isRequired
+            errorContent={errors.amount?.message}
+            {...register("amount", { valueAsNumber: true })}
+          />
+
+          <TextField
+            type="text"
+            label="Descrição (opcional)"
+            placeholder="Ex: Supermercado, Salário, etc."
+            className="w-full"
+            inputClassName="bg-[#555555] border-[#555555] text-[#d3d3d3] placeholder:text-[#999999] focus:border-[#296BA6] focus:ring-1 focus:ring-[#296BA6] transition-colors"
+            tooltipContent="Descrição opcional da transação"
+            errorContent={errors.description?.message}
+            {...register("description")}
+          />
+
+          <TextField
+            type="datetime-local"
+            label="Data e Hora"
+            className="w-full"
+            inputClassName="bg-[#555555] border-[#555555] text-[#d3d3d3] placeholder:text-[#999999] focus:border-[#296BA6] focus:ring-1 focus:ring-[#296BA6] transition-colors"
+            tooltipContent="Data e hora da transação"
+            isRequired
+            errorContent={errors.transactionDate?.message}
+            {...register("transactionDate")}
+          />
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              onClick={closeModal}
+              className="flex-1 bg-[#555555] hover:bg-[#666666] text-[#d3d3d3] py-2 rounded-md transition-colors"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              isDisabled={isSubmitting}
+              className="flex-1 bg-[#4592D7] hover:bg-[#5AA4E6] text-white py-2 rounded-md transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

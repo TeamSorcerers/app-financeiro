@@ -11,7 +11,6 @@ interface TransactionUpdateData {
   description?: string;
   transactionDate?: Date;
   groupId?: number;
-  categoryId?: number;
 }
 
 export async function GET (
@@ -104,21 +103,27 @@ export async function PUT (
       }, { status: 400 });
     }
 
-    // Verificar se o usuário tem acesso ao grupo (se groupId foi fornecido)
-    if (data.groupId) {
-      const groupMember = await prisma.financialGroupMember.findFirst({
-        where: {
-          userId: session.user.id,
-          financialGroupId: data.groupId,
-        },
-      });
+    // Obter o grupo pessoal do usuário
+    const group = await prisma.financialGroup.findFirst({ where: { members: { some: { userId: session.user.id, isOwner: true } } } });
 
-      if (!groupMember) {
-        return Response.json({ error: "Acesso negado ao grupo financeiro" }, { status: 403 });
-      }
+    if (!group) {
+      return Response.json({ error: "Grupo não encontrado" }, { status: 404 });
+    }
+
+    // Verificar se o usuário tem acesso ao grupo (se groupId foi fornecido)
+    const groupMember = await prisma.financialGroupMember.findFirst({
+      where: {
+        userId: session.user.id,
+        financialGroupId: group.id,
+      },
+    });
+
+    if (!groupMember) {
+      return Response.json({ error: "Acesso negado ao grupo financeiro" }, { status: 403 });
     }
 
     // Verificar se a categoria existe (se categoryId foi fornecida)
+    /*
     if (data.categoryId) {
       const category = await prisma.financialCategory.findUnique({ where: { id: data.categoryId } });
 
@@ -126,6 +131,7 @@ export async function PUT (
         return Response.json({ error: "Categoria não encontrada" }, { status: 404 });
       }
     }
+    */
 
     const updateData: TransactionUpdateData = {};
 
@@ -140,12 +146,6 @@ export async function PUT (
     }
     if (data.transactionDate !== undefined) {
       updateData.transactionDate = new Date(data.transactionDate);
-    }
-    if (data.groupId !== undefined) {
-      updateData.groupId = data.groupId;
-    }
-    if (data.categoryId !== undefined) {
-      updateData.categoryId = data.categoryId;
     }
 
     const transaction = await prisma.transaction.update({

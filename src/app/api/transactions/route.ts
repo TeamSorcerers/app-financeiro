@@ -8,7 +8,6 @@ interface TransactionWhere {
   createdById: number;
   groupId?: number;
   type?: "INCOME" | "EXPENSE";
-  categoryId?: number;
 }
 
 export async function GET (request: NextRequest) {
@@ -22,7 +21,6 @@ export async function GET (request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const groupId = searchParams.get("groupId");
     const type = searchParams.get("type");
-    const categoryId = searchParams.get("categoryId");
 
     const where: TransactionWhere = { createdById: session.user.id };
 
@@ -34,14 +32,9 @@ export async function GET (request: NextRequest) {
       where.type = type;
     }
 
-    if (categoryId) {
-      where.categoryId = Number(categoryId);
-    }
-
     const transactions = await prisma.transaction.findMany({
       where,
       include: {
-        category: true,
         group: true,
         createdBy: {
           select: {
@@ -85,11 +78,18 @@ export async function POST (request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Obter o grupo pessoal do usuário
+    const group = await prisma.financialGroup.findFirst({ where: { members: { some: { userId: session.user.id, isOwner: true } } } });
+
+    if (!group) {
+      return Response.json({ error: "Grupo não encontrado" }, { status: 404 });
+    }
+
     // Verificar se o usuário tem acesso ao grupo
     const groupMember = await prisma.financialGroupMember.findFirst({
       where: {
         userId: session.user.id,
-        financialGroupId: data.groupId,
+        financialGroupId: group.id,
       },
     });
 
@@ -98,6 +98,7 @@ export async function POST (request: NextRequest) {
     }
 
     // Verificar se a categoria existe (se fornecida)
+    /*
     if (data.categoryId) {
       const category = await prisma.financialCategory.findUnique({ where: { id: data.categoryId } });
 
@@ -105,6 +106,7 @@ export async function POST (request: NextRequest) {
         return Response.json({ error: "Categoria não encontrada" }, { status: 404 });
       }
     }
+    */
 
     const transaction = await prisma.transaction.create({
       data: {
@@ -113,8 +115,7 @@ export async function POST (request: NextRequest) {
         description: data.description,
         transactionDate: new Date(data.transactionDate),
         createdById: session.user.id,
-        groupId: data.groupId,
-        categoryId: data.categoryId,
+        groupId: group.id,
       },
       include: {
         category: true,
