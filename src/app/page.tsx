@@ -1,48 +1,259 @@
+"use client";
+
 import Button from "@/components/ui/button";
-import TextField from "@/components/ui/textfield";
+import Card from "@/components/ui/card";
+import Divider from "@/components/ui/divider";
+import { ArrowDown, ArrowUp, Plus, User } from "lucide-react";
+import { useSession } from "next-auth/react";
+
+// Mock de dados do usuário e transações
+const mockUser = {
+  name: "João Silva",
+  balance: 2450.75,
+  groupName: "Pessoal",
+};
+
+const mockSummary = {
+  income: 4300.00,
+  expenses: 1849.25,
+  balance: 2450.75,
+  topCategory: {
+    name: "Alimentação",
+    amount: 235.50,
+  },
+};
+
+const mockTransactions = [
+  {
+    id: 1,
+    description: "Salário",
+    amount: 3500.00,
+    type: "INCOME" as const,
+    date: "2024-01-15",
+    category: "Trabalho",
+  },
+  {
+    id: 2,
+    description: "Supermercado",
+    amount: 235.50,
+    type: "EXPENSE" as const,
+    date: "2024-01-14",
+    category: "Alimentação",
+  },
+  {
+    id: 3,
+    description: "Combustível",
+    amount: 180.00,
+    type: "EXPENSE" as const,
+    date: "2024-01-13",
+    category: "Transporte",
+  },
+  {
+    id: 4,
+    description: "Freelance",
+    amount: 800.00,
+    type: "INCOME" as const,
+    date: "2024-01-12",
+    category: "Trabalho",
+  },
+  {
+    id: 5,
+    description: "Internet",
+    amount: 89.90,
+    type: "EXPENSE" as const,
+    date: "2024-01-10",
+    category: "Serviços",
+  },
+];
 
 export default function Home () {
+  const { status, data: session } = useSession();
+
+  const formatCurrency = (amount: number) => new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(amount);
+
+  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  // Estados de carregamento e não autenticado
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-[#3c3c3c] flex items-center justify-center">
+        <div className="text-[#d3d3d3] text-lg">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return (
+      <div className="min-h-screen bg-[#3c3c3c] flex items-center justify-center">
+        <div className="text-[#d3d3d3] text-lg">Redirecionando...</div>
+      </div>
+    );
+  }
+
+  // Dados do usuário (real ou fallback para mock)
+  const userName = session?.user?.name || mockUser.name;
+  const userBalance = mockUser.balance; // Por enquanto mantém o mock para o saldo
+
   return (
-    <div className="w-full h-screen flex flex-col gap-4 items-center justify-center">
-      <Button className="w-80 h-40 text-2xl">Testando</Button>
-      <div className="grid grid-cols-2 grid-rows-2 gap-4">
-        <TextField
-          name="email"
-          type="email"
-          label="Email"
-          placeholder="Digite seu email"
-          className="w-72"
-        />
+    <div className="min-h-screen bg-[#3c3c3c] p-4">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header com informações do usuário */}
+        <Card className="bg-[#4A4A4A] rounded-lg border-t-4 border-t-[#296BA6] shadow-lg overflow-hidden">
+          <div className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-[#555555] rounded-full flex items-center justify-center border-2 border-[#296BA6] flex-shrink-0">
+                  <User size={32} className="text-[#d3d3d3]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-[#d3d3d3] text-xl md:text-2xl font-semibold truncate">
+                    Olá, {userName}
+                  </h1>
+                  <p className="text-[#d3d3d3] opacity-80 text-sm">
+                    Grupo: {mockUser.groupName}
+                  </p>
+                </div>
+              </div>
 
-        <TextField
-          name="password"
-          type="password"
-          label="Senha"
-          isRequired
-          placeholder="Digite sua senha"
-          className="w-72"
-        />
+              <div className="text-left sm:text-right flex-shrink-0">
+                <p className="text-[#d3d3d3] text-sm opacity-80 mb-1">Saldo atual</p>
+                <p className={`text-xl md:text-2xl font-bold ${userBalance >= 0 ? "text-[#5AA4E6]" : "text-[#FF6B6B]"}`}>
+                  {formatCurrency(userBalance)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
 
-        <TextField
-          name="confirmPassword"
-          type="password"
-          label="Confirmar Senha"
-          isRequired
-          tooltipContent="Repita sua senha"
-          placeholder="Confirme sua senha"
-          className="w-72"
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Botão de nova transação */}
+          <Card className="bg-[#4A4A4A] rounded-lg border-t-2 border-t-[#5AA4E6] shadow-lg overflow-hidden">
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 bg-[#5AA4E6] rounded-full flex items-center justify-center mx-auto mb-4">
+                <Plus size={24} className="text-white" />
+              </div>
+              <h3 className="text-[#d3d3d3] text-lg font-semibold mb-2">
+                Nova Transação
+              </h3>
+              <p className="text-[#d3d3d3] opacity-80 text-sm mb-4">
+                Adicione uma receita ou despesa
+              </p>
+              <Button className="w-full bg-[#4592D7] py-2 hover:bg-[#5AA4E6] text-white font-medium rounded-md transition-colors duration-200">
+                Adicionar
+              </Button>
+            </div>
+          </Card>
 
-        <TextField
-          name="error"
-          type="text"
-          label="Demonstração de erro"
-          isRequired
-          tooltipContent="Erro"
-          errorContent="Este campo é obrigatório"
-          placeholder="Erro"
-          className="w-72"
-        />
+          {/* Resumo rápido */}
+          <Card className="bg-[#4A4A4A] rounded-lg border-t-2 border-t-[#3A7BBD] shadow-lg overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-[#d3d3d3] text-lg font-semibold mb-4">
+                Este Mês
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <ArrowUp size={16} className="text-[#5AA4E6]" />
+                    <span className="text-[#d3d3d3] text-sm">Receitas</span>
+                  </div>
+                  <span className="text-[#5AA4E6] font-medium">
+                    {formatCurrency(mockSummary.income)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <ArrowDown size={16} className="text-[#FF6B6B]" />
+                    <span className="text-[#d3d3d3] text-sm">Despesas</span>
+                  </div>
+                  <span className="text-[#FF6B6B] font-medium">
+                    {formatCurrency(mockSummary.expenses)}
+                  </span>
+                </div>
+                <Divider className="border-[#555555]" />
+                <div className="flex items-center justify-between">
+                  <span className="text-[#d3d3d3] font-medium">Saldo</span>
+                  <span className="text-[#5AA4E6] font-bold">
+                    {formatCurrency(mockSummary.balance)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Categoria com mais gastos */}
+          <Card className="bg-[#4A4A4A] rounded-lg border-t-2 border-t-[#3A7BBD] shadow-lg overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-[#d3d3d3] text-lg font-semibold mb-4">
+                Maior Gasto
+              </h3>
+              <div className="text-center">
+                <div className="w-12 h-12 bg-[#3A7BBD] rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-white font-bold text-lg">🛒</span>
+                </div>
+                <p className="text-[#d3d3d3] font-medium">{mockSummary.topCategory.name}</p>
+                <p className="text-[#FF6B6B] text-xl font-bold">
+                  {formatCurrency(mockSummary.topCategory.amount)}
+                </p>
+                <p className="text-[#d3d3d3] opacity-60 text-xs mt-1">
+                  neste mês
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Histórico de transações */}
+        <Card className="bg-[#4A4A4A] rounded-lg border-t-2 border-t-[#296BA6] shadow-lg overflow-hidden">
+          <div className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <h2 className="text-[#d3d3d3] text-lg md:text-xl font-semibold">
+                Transações Recentes
+              </h2>
+              <Button className="bg-[#555555] hover:bg-[#666666] text-[#d3d3d3] text-sm px-4 py-2 rounded-md transition-colors w-full sm:w-auto">
+                Ver Todas
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {mockTransactions.map((transaction) => {
+                const isIncome = transaction.type === "INCOME";
+
+                return (
+                  <div
+                    key={transaction.id}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-[#555555] rounded-lg hover:bg-[#606060] transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[#d3d3d3] font-medium text-base">
+                        {transaction.description}
+                      </p>
+                      <p className="text-[#d3d3d3] opacity-60 text-sm mt-1">
+                        {transaction.category} • {formatDate(transaction.date)}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right flex-shrink-0">
+                      <p className={`font-bold text-lg ${
+                        isIncome ?
+                          "text-[#5AA4E6]" :
+                          "text-[#FF6B6B]"
+                      }`}>
+                        {isIncome ? "+" : "-"}
+                        {formatCurrency(transaction.amount)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );
