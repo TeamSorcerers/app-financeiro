@@ -110,7 +110,7 @@ export async function POST (request: NextRequest) {
       },
     });
 
-    logger.info(`Transação criada com sucesso para usuário ${session.user.id}`);
+    logger.info(`Transação criada com sucesso para usuário ${session.user.userId}`);
 
     return Response.json({
       data: transaction,

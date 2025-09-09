@@ -53,7 +53,7 @@ export async function GET (
       return Response.json({ error: "Transação não encontrada" }, { status: 404 });
     }
 
-    logger.info(`Obtendo transação com id: ${id} para usuário ${session.user.id}`);
+    logger.info(`Obtendo transação com id: ${id} para usuário ${session.user.userId}`);
 
     return Response.json({ data: transaction });
   } catch (error) {
@@ -164,7 +164,7 @@ export async function PUT (
       },
     });
 
-    logger.info(`Transação atualizada com sucesso com id: ${id} para usuário ${session.user.id}`);
+    logger.info(`Transação atualizada com sucesso com id: ${id} para usuário ${session.user.userId}`);
 
     return Response.json({
       data: transaction,
@@ -209,7 +209,7 @@ export async function DELETE (
 
     await prisma.transaction.delete({ where: { id: transactionId } });
 
-    logger.info(`Transação apagada com sucesso com id: ${id} para usuário ${session.user.id}`);
+    logger.info(`Transação apagada com sucesso com id: ${id} para usuário ${session.user.userId}`);
 
     return Response.json({ message: "Transação apagada com sucesso" });
   } catch (error) {

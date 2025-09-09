@@ -73,11 +73,18 @@ export default function Home () {
     currency: "BRL",
   }).format(amount);
 
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  const formatDateTime = (dateString: string) => {
+    const d = new Date(dateString);
+
+    return `${d.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })} ${d.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
+  };
 
   const onLogout = async () => {
     await signOut({ callbackUrl: "/login" });
@@ -305,7 +312,7 @@ export default function Home () {
                           {transaction.description || "Sem descrição"}
                         </p>
                         <p className="text-[#d3d3d3] opacity-60 text-sm mt-1">
-                          {transaction.category?.name || "Sem categoria"} • {formatDate(transaction.transactionDate)}
+                          {transaction.category?.name || "Sem categoria"} • {formatDateTime(transaction.transactionDate)}
                         </p>
                       </div>
                       <div className="text-left sm:text-right flex-shrink-0">
