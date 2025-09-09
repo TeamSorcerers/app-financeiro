@@ -8,10 +8,11 @@ import { AuthLoginSchema, AuthLoginSchemaData } from "@/lib/shared/schemas/auth"
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { useForm } from "react-hook-form";
 import { loginAction } from "./actions";
 
-export default function LoginPage () {
+function LoginForm () {
   const { update } = useSession();
 
   const {
@@ -123,5 +124,13 @@ export default function LoginPage () {
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage () {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
