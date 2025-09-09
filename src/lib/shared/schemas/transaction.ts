@@ -7,7 +7,7 @@ export const TransactionSchema = z.object({
   type: z.enum([ "INCOME", "EXPENSE" ], { message: "Tipo deve ser INCOME ou EXPENSE" }),
   description: z.string().max(MAX_LENGTH_DESCRIPTION, `Descrição deve ter no máximo ${MAX_LENGTH_DESCRIPTION} caracteres`).
     optional(),
-  transactionDate: z.iso.datetime("Data inválida"),
+  transactionDate: z.iso.datetime({ local: true, error: "Data inválida" }),
 });
 
 export type TransactionSchemaData = z.infer<typeof TransactionSchema>;

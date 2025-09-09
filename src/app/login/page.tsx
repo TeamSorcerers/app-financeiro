@@ -6,11 +6,14 @@ import Divider from "@/components/ui/divider";
 import TextField from "@/components/ui/textfield";
 import { AuthLoginSchema, AuthLoginSchemaData } from "@/lib/shared/schemas/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
+import { loginAction } from "./actions";
 
 export default function LoginPage () {
+  const { update } = useSession();
+
   const {
     register,
     handleSubmit,
@@ -26,26 +29,23 @@ export default function LoginPage () {
 
   const onSubmit = async (data: AuthLoginSchemaData) => {
     try {
-      const result = await signIn("credentials", {
-        email: data.email,
-        password: data.password,
-        redirect: false,
-      });
+      const { ok, message } = await loginAction(data);
 
-      if (result?.error) {
+      if (!ok) {
         setError("root", {
           type: "server",
-          message: "E-mail ou senha incorretos",
+          message: message || "E-mail ou senha incorretos",
         });
 
         return;
       }
 
+      update();
+
       // Login bem-sucedido - redirecionar
       const redirectTo = searchParams.get("redirect") || "/";
 
       router.push(redirectTo);
-      router.refresh();
     } catch (error) {
       console.error("Erro no login:", error);
       setError("root", {

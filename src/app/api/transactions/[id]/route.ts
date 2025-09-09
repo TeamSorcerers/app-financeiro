@@ -20,7 +20,7 @@ export async function GET (
   try {
     const session = await auth();
 
-    if (!session?.user?.id) {
+    if (session === null) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
 
@@ -34,7 +34,7 @@ export async function GET (
     const transaction = await prisma.transaction.findFirst({
       where: {
         id: transactionId,
-        createdById: session.user.id,
+        createdById: session.user.userId,
       },
       include: {
         category: true,
@@ -85,7 +85,7 @@ export async function PUT (
     const existingTransaction = await prisma.transaction.findFirst({
       where: {
         id: transactionId,
-        createdById: session.user.id,
+        createdById: session.user.userId,
       },
     });
 
@@ -104,7 +104,7 @@ export async function PUT (
     }
 
     // Obter o grupo pessoal do usuário
-    const group = await prisma.financialGroup.findFirst({ where: { members: { some: { userId: session.user.id, isOwner: true } } } });
+    const group = await prisma.financialGroup.findFirst({ where: { members: { some: { userId: session.user.userId, isOwner: true } } } });
 
     if (!group) {
       return Response.json({ error: "Grupo não encontrado" }, { status: 404 });
@@ -113,7 +113,7 @@ export async function PUT (
     // Verificar se o usuário tem acesso ao grupo (se groupId foi fornecido)
     const groupMember = await prisma.financialGroupMember.findFirst({
       where: {
-        userId: session.user.id,
+        userId: session.user.userId,
         financialGroupId: group.id,
       },
     });
@@ -199,7 +199,7 @@ export async function DELETE (
     const existingTransaction = await prisma.transaction.findFirst({
       where: {
         id: transactionId,
-        createdById: session.user.id,
+        createdById: session.user.userId,
       },
     });
 

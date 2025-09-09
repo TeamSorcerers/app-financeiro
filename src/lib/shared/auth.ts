@@ -2,7 +2,7 @@ import gateways from "@/lib/client/gateways";
 import { prisma } from "@/lib/shared/prisma";
 import { AuthLoginSchema } from "@/lib/shared/schemas/auth";
 import { compare } from "bcryptjs";
-import NextAuth, { CredentialsSignin } from "next-auth";
+import NextAuth, { CredentialsSignin, DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 
 class InvalidCredentialsError extends CredentialsSignin {
@@ -16,29 +16,25 @@ declare module "next-auth" {
   interface Session {
     user: {
       /** The user's ID. */
-      id: number,
+      userId: number
 
-      /** The user's display name. */
-      name: string
-    }
+      /**
+       * By default, TypeScript merges new interface properties and overwrites existing ones.
+       * In this case, the default session user properties will be overwritten,
+       * with the new ones defined above. To keep the default session user properties,
+       * you need to add them back into the newly declared interface.
+       */
+    } & DefaultSession["user"]
   }
 
   interface User {
     /** The user's ID. */
-    id: number,
-
-    /** The user's display name. */
-    name: string
+    userId: number
   }
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   basePath: gateways.AUTH(),
-  session: {
-    strategy: "jwt",
-    maxAge: Number(process.env.SESSION_MAX_AGE), // 3 dias
-    updateAge: Number(process.env.SESSION_UPDATE_AGE), // Revalida a cada 4 horas
-  },
   providers: [
     Credentials({
       credentials: {
@@ -66,10 +62,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         return {
-          id: user.id,
+          id: user.id.toString(),
+          userId: user.id,
           name: user.name,
         };
       },
     }),
   ],
+  callbacks: {
+    jwt ({ token, user }) {
+      if (user) {
+        token.userId = user.userId;
+      }
+
+      return token;
+    },
+    session ({ session, token }) {
+      session.user.userId = token.userId as number;
+
+      return session;
+    },
+  },
 });
