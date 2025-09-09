@@ -42,4 +42,12 @@ export default Object.freeze({
   CREATE_TRANSACTION () {
     return this.GET_ALL_TRANSACTIONS();
   },
+
+  /**
+   * [GET] /group/me
+   * @returns {string} A URL base para obter informações sobre o grupo do usuário.
+   */
+  GROUP_ME () {
+    return `${this.ROOT()}/group/me`;
+  },
 });

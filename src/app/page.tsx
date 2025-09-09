@@ -6,77 +6,30 @@ import Divider from "@/components/ui/divider";
 import Modal from "@/components/ui/modal";
 import TextField from "@/components/ui/textfield";
 import gateways from "@/lib/client/gateways";
-import { HTTP_STATUS } from "@/lib/shared/constants";
+import { DATETIME_LOCAL_LENGTH, HTTP_STATUS } from "@/lib/shared/constants";
 import { TransactionSchema, TransactionSchemaData } from "@/lib/shared/schemas/transaction";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowDown, ArrowUp, LogOut, Plus, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
-// Mock de dados do usuário e transações
-const mockUser = {
-  name: "João Silva",
-  balance: 2450.75,
-  groupName: "Pessoal",
-};
-
-const mockSummary = {
-  income: 4300.00,
-  expenses: 1849.25,
-  balance: 2450.75,
-  topCategory: {
-    name: "Alimentação",
-    amount: 235.50,
-  },
-};
-
-const mockTransactions = [
-  {
-    id: 1,
-    description: "Salário",
-    amount: 3500.00,
-    type: "INCOME" as const,
-    date: "2024-01-15",
-    category: "Trabalho",
-  },
-  {
-    id: 2,
-    description: "Supermercado",
-    amount: 235.50,
-    type: "EXPENSE" as const,
-    date: "2024-01-14",
-    category: "Alimentação",
-  },
-  {
-    id: 3,
-    description: "Combustível",
-    amount: 180.00,
-    type: "EXPENSE" as const,
-    date: "2024-01-13",
-    category: "Transporte",
-  },
-  {
-    id: 4,
-    description: "Freelance",
-    amount: 800.00,
-    type: "INCOME" as const,
-    date: "2024-01-12",
-    category: "Trabalho",
-  },
-  {
-    id: 5,
-    description: "Internet",
-    amount: 89.90,
-    type: "EXPENSE" as const,
-    date: "2024-01-10",
-    category: "Serviços",
-  },
-];
+// Definição de tipo para transação
+interface Transaction {
+  id: number;
+  amount: number;
+  type: "INCOME" | "EXPENSE";
+  description?: string;
+  transactionDate: string;
+  category?: { name: string } | null;
+}
 
 export default function Home () {
   const { status: sessionStatus, data: session } = useSession();
   const [ isModalOpen, setIsModalOpen ] = useState(false);
+  const [ transactions, setTransactions ] = useState<Transaction[]>([]);
+  const [ isLoadingTransactions, setIsLoadingTransactions ] = useState(true);
+  const [ groupBalance, setGroupBalance ] = useState<number | null>(null);
 
   const {
     register,
@@ -89,9 +42,52 @@ export default function Home () {
     mode: "onChange",
     defaultValues: {
       type: "EXPENSE",
-      transactionDate: new Date().toISOString(),
+      transactionDate: new Date().toISOString().
+        slice(0, DATETIME_LOCAL_LENGTH),
     },
   });
+
+  // Busca transações do backend
+  const fetchTransactions = async () => {
+    setIsLoadingTransactions(true);
+    try {
+      const res = await fetch(gateways.GET_ALL_TRANSACTIONS(), { method: "GET" });
+      const result = await res.json();
+
+      if (res.ok && Array.isArray(result.data)) {
+        setTransactions(result.data);
+      } else {
+        setTransactions([]);
+      }
+    } catch {
+      setTransactions([]);
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
+
+  // Busca saldo do grupo do usuário
+  const fetchGroupBalance = async () => {
+    try {
+      const res = await fetch(gateways.GROUP_ME(), { method: "GET" });
+      const result = await res.json();
+
+      if (res.ok && result.data?.balance !== undefined) {
+        setGroupBalance(result.data.balance);
+      } else {
+        setGroupBalance(null);
+      }
+    } catch {
+      setGroupBalance(null);
+    }
+  };
+
+  useEffect(() => {
+    if (sessionStatus === "authenticated") {
+      fetchTransactions();
+      fetchGroupBalance();
+    }
+  }, [ sessionStatus ]);
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -137,7 +133,6 @@ export default function Home () {
 
           return;
         }
-
         setError("root", {
           type: "server",
           message: result.error || "Erro interno do servidor",
@@ -145,14 +140,10 @@ export default function Home () {
 
         return;
       }
-
-      // Sucesso - fechar modal e limpar form
       closeModal();
-      console.log("Transação criada com sucesso:", result);
-
-      // TODO: Atualizar lista de transações
-    } catch (error) {
-      console.error("Erro de rede:", error);
+      fetchTransactions(); // Atualiza lista
+      fetchGroupBalance(); // Atualiza saldo
+    } catch {
       setError("root", {
         type: "network",
         message: "Erro de conexão. Tente novamente.",
@@ -178,8 +169,8 @@ export default function Home () {
   }
 
   // Dados do usuário (real ou fallback para mock)
-  const userName = session?.user?.name || mockUser.name;
-  const userBalance = mockUser.balance; // Por enquanto mantém o mock para o saldo
+  const userName = session?.user?.name || "Usuário";
+  const userBalance = groupBalance ?? 0;
 
   return (
     <div className="min-h-screen bg-[#3c3c3c] p-4">
@@ -197,7 +188,7 @@ export default function Home () {
                     Olá, {userName}
                   </h1>
                   <p className="text-[#d3d3d3] opacity-80 text-sm">
-                    Grupo: {mockUser.groupName}
+                    Grupo: Pessoal
                   </p>
                 </div>
               </div>
@@ -256,7 +247,8 @@ export default function Home () {
                     <span className="text-[#d3d3d3] text-sm">Receitas</span>
                   </div>
                   <span className="text-[#5AA4E6] font-medium">
-                    {formatCurrency(mockSummary.income)}
+                    {/* TODO: Calcular receitas reais do mês */}
+                    {formatCurrency((transactions as Transaction[]).filter((t) => t.type === "INCOME").reduce((acc, t) => acc + t.amount, 0))}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -265,14 +257,15 @@ export default function Home () {
                     <span className="text-[#d3d3d3] text-sm">Despesas</span>
                   </div>
                   <span className="text-[#FF6B6B] font-medium">
-                    {formatCurrency(mockSummary.expenses)}
+                    {/* TODO: Calcular despesas reais do mês */}
+                    {formatCurrency((transactions as Transaction[]).filter((t) => t.type === "EXPENSE").reduce((acc, t) => acc + t.amount, 0))}
                   </span>
                 </div>
                 <Divider className="border-[#555555]" />
                 <div className="flex items-center justify-between">
                   <span className="text-[#d3d3d3] font-medium">Saldo</span>
                   <span className="text-[#5AA4E6] font-bold">
-                    {formatCurrency(mockSummary.balance)}
+                    {formatCurrency(userBalance)}
                   </span>
                 </div>
               </div>
@@ -289,9 +282,48 @@ export default function Home () {
                 <div className="w-12 h-12 bg-[#3A7BBD] rounded-full flex items-center justify-center mx-auto mb-3">
                   <span className="text-white font-bold text-lg">🛒</span>
                 </div>
-                <p className="text-[#d3d3d3] font-medium">{mockSummary.topCategory.name}</p>
+                <p className="text-[#d3d3d3] font-medium">
+                  {/* Categoria com maior gasto */}
+                  {(() => {
+                    const expenses = transactions.filter((t) => t.type === "EXPENSE");
+                    const byCategory: Record<string, number> = {};
+
+                    for (const t of expenses) {
+                      const cat = t.category?.name || "Sem categoria";
+
+                      byCategory[cat] = (byCategory[cat] || 0) + t.amount;
+                    }
+                    const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+
+                    if (sorted.length > 0) {
+                      const [ [ catName ] ] = sorted;
+
+                      return String(catName);
+                    }
+
+                    return "Sem categoria";
+                  })()}
+                </p>
                 <p className="text-[#FF6B6B] text-xl font-bold">
-                  {formatCurrency(mockSummary.topCategory.amount)}
+                  {(() => {
+                    const expenses = transactions.filter((t) => t.type === "EXPENSE");
+                    const byCategory: Record<string, number> = {};
+
+                    for (const t of expenses) {
+                      const cat = t.category?.name || "Sem categoria";
+
+                      byCategory[cat] = (byCategory[cat] || 0) + t.amount;
+                    }
+                    const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+
+                    if (sorted.length > 0) {
+                      const [ [ , value ] ] = sorted;
+
+                      return formatCurrency(value);
+                    }
+
+                    return formatCurrency(0);
+                  })()}
                 </p>
                 <p className="text-[#d3d3d3] opacity-60 text-xs mt-1">
                   neste mês
@@ -312,37 +344,40 @@ export default function Home () {
                 Ver Todas
               </Button>
             </div>
-
             <div className="space-y-3">
-              {mockTransactions.map((transaction) => {
-                const isIncome = transaction.type === "INCOME";
+              {isLoadingTransactions &&
+                <div className="text-[#d3d3d3] text-center py-8">Carregando transações...</div>
+              }
+              {!isLoadingTransactions && transactions.length === 0 &&
+                <div className="text-[#d3d3d3] text-center py-8">Nenhuma transação encontrada.</div>
+              }
+              {!isLoadingTransactions && transactions.length > 0 &&
+                transactions.map((transaction) => {
+                  const isIncome = transaction.type === "INCOME";
 
-                return (
-                  <div
-                    key={transaction.id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-[#555555] rounded-lg hover:bg-[#606060] transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[#d3d3d3] font-medium text-base">
-                        {transaction.description}
-                      </p>
-                      <p className="text-[#d3d3d3] opacity-60 text-sm mt-1">
-                        {transaction.category} • {formatDate(transaction.date)}
-                      </p>
+                  return (
+                    <div
+                      key={transaction.id}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-[#555555] rounded-lg hover:bg-[#606060] transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[#d3d3d3] font-medium text-base">
+                          {transaction.description || "Sem descrição"}
+                        </p>
+                        <p className="text-[#d3d3d3] opacity-60 text-sm mt-1">
+                          {transaction.category?.name || "Sem categoria"} • {formatDate(transaction.transactionDate)}
+                        </p>
+                      </div>
+                      <div className="text-left sm:text-right flex-shrink-0">
+                        <p className={`font-bold text-lg ${isIncome ? "text-[#5AA4E6]" : "text-[#FF6B6B]"}`}>
+                          {isIncome ? "+" : "-"}
+                          {formatCurrency(transaction.amount)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-left sm:text-right flex-shrink-0">
-                      <p className={`font-bold text-lg ${
-                        isIncome ?
-                          "text-[#5AA4E6]" :
-                          "text-[#FF6B6B]"
-                      }`}>
-                        {isIncome ? "+" : "-"}
-                        {formatCurrency(transaction.amount)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              }
             </div>
           </div>
         </Card>
