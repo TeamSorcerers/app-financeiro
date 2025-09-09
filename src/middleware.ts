@@ -10,8 +10,7 @@ export default auth((req) => {
     nextUrl.pathname.startsWith("/register");
 
   // Rotas públicas que não precisam de autenticação
-  const isPublicRoute = nextUrl.pathname === "/" ||
-    nextUrl.pathname.startsWith("/api/auth") ||
+  const isPublicRoute = nextUrl.pathname.startsWith("/api/auth") ||
     nextUrl.pathname.startsWith("/_next") ||
     nextUrl.pathname.startsWith("/favicon");
 
