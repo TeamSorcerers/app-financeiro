@@ -1,5 +1,4 @@
 import logger from "@/lib/server/logger";
-import { signIn } from "@/lib/shared/auth";
 import { BCRYPT_ROUNDS, HTTP_STATUS, PRETTY_PRINT_INDENT } from "@/lib/shared/constants";
 import { prisma } from "@/lib/shared/prisma";
 import { AuthRegisterSchema } from "@/lib/shared/schemas/auth";
@@ -61,12 +60,6 @@ export async function POST (req: NextRequest) {
         },
         createdBy: { connect: { id: user.id } },
       },
-    });
-
-    await signIn("credentials", {
-      email: user.email,
-      password: data.password,
-      redirect: false,
     });
 
     logger.info(`Usuário criado com sucesso: ${
