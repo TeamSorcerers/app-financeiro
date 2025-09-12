@@ -5,7 +5,7 @@ import Button from "@/components/ui/button";
 import Card from "@/components/ui/card";
 import Divider from "@/components/ui/divider";
 import gateways from "@/lib/client/gateways";
-import { ArrowDown, ArrowUp, LogOut, Plus, User } from "lucide-react";
+import { ArrowDown, ArrowUp, LogOut, Plus, Trash2, User } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
@@ -25,6 +25,7 @@ export default function Home () {
   const [ transactions, setTransactions ] = useState<Transaction[]>([]);
   const [ isLoadingTransactions, setIsLoadingTransactions ] = useState(true);
   const [ groupBalance, setGroupBalance ] = useState<number | null>(null);
+  const [ errorMessage, setErrorMessage ] = useState<string | null>(null);
 
   // Busca transações do backend
   const fetchTransactions = async () => {
@@ -58,6 +59,25 @@ export default function Home () {
       }
     } catch {
       setGroupBalance(null);
+    }
+  };
+
+  const onDeleteTransaction = async (id: number) => {
+    try {
+      const res = await fetch(gateways.DELETE_TRANSACTION(id), { method: "DELETE", credentials: "include" });
+
+      if (res.ok) {
+        fetchTransactions();
+        fetchGroupBalance();
+        setErrorMessage(null);
+      } else {
+        const result = await res.json();
+
+        setErrorMessage(result?.error || "Erro ao excluir transação.");
+      }
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Erro de conexão ao excluir transação.");
     }
   };
 
@@ -122,6 +142,13 @@ export default function Home () {
   return (
     <div className="min-h-screen bg-[#3c3c3c] p-4">
       <div className="max-w-6xl mx-auto space-y-6">
+        {/* Mensagem de erro global */}
+        {errorMessage &&
+          <div className="mb-4 p-3 rounded bg-[#FF6B6B]/80 text-white text-center font-medium">
+            {errorMessage}
+          </div>
+        }
+
         {/* Header com informações do usuário */}
         <Card className="bg-[#4A4A4A] rounded-lg border-t-4 border-t-[#296BA6] shadow-lg overflow-hidden">
           <div className="p-4 md:p-6">
@@ -315,11 +342,19 @@ export default function Home () {
                           {transaction.category?.name || "Sem categoria"} • {formatDateTime(transaction.transactionDate)}
                         </p>
                       </div>
-                      <div className="text-left sm:text-right flex-shrink-0">
+                      <div className="flex items-center gap-2 text-left sm:text-right flex-shrink-0">
                         <p className={`font-bold text-lg ${isIncome ? "text-[#5AA4E6]" : "text-[#FF6B6B]"}`}>
                           {isIncome ? "+" : "-"}
                           {formatCurrency(transaction.amount)}
                         </p>
+                        <button
+                          type="button"
+                          className="transition-colors cursor-pointer text-[#d3d3d3] rounded-md bg-transparent hover:bg-[#FF6B6B]/60 focus:outline-none focus:ring-2 focus:ring-[#FF6B6B] active:scale-95 sm:p-2 p-3 sm:ml-2 ml-0"
+                          title="Excluir transação"
+                          onClick={() => onDeleteTransaction(transaction.id)}
+                        >
+                          <Trash2 size={22} className="sm:w-5 sm:h-5 w-6 h-6" />
+                        </button>
                       </div>
                     </div>
                   );

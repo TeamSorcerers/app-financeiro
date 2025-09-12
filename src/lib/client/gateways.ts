@@ -44,6 +44,15 @@ export default Object.freeze({
   },
 
   /**
+   * [DELETE] /transactions/:id
+   * @param   {number} id - O ID da transação a ser excluída.
+   * @returns {string}    A URL base para excluir uma transação.
+   */
+  DELETE_TRANSACTION (id: number) {
+    return `${this.GET_ALL_TRANSACTIONS()}/${id}`;
+  },
+
+  /**
    * [GET] /group/me
    * @returns {string} A URL base para obter informações sobre o grupo do usuário.
    */
