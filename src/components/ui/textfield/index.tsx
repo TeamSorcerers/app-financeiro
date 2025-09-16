@@ -19,6 +19,8 @@ export interface TextFieldProps {
   className?: string;
   inputClassName?: string;
 
+  step?: number;
+
   ref?: React.Ref<HTMLInputElement>;
 
   value?: string;
@@ -37,6 +39,7 @@ export default function TextField ({
   placeholder,
   className,
   inputClassName,
+  step,
   ref,
   value,
   onChange,
@@ -56,6 +59,7 @@ export default function TextField ({
           type={isPasswordType && isPasswordVisible ? "text" : type}
           id={name}
           name={name}
+          step={step}
           className={`
             w-full
             p-2
