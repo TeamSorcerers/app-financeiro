@@ -24,7 +24,7 @@ if (logFile) {
   // Create logs directory if it doesn't exist
   const logDir = path.dirname(logFile);
 
-  if (!fs.existsSync(logDir) && !isDevelopment) {
+  if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
 

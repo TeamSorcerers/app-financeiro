@@ -138,6 +138,7 @@ export default function AddTransaction ({ isOpen, onClose, onSuccess }: AddTrans
         <TextField
           type="number"
           label="Valor"
+          step={0.01}
           placeholder="0,00"
           className="w-full"
           inputClassName="bg-[#555555] border-[#555555] text-[#d3d3d3] placeholder:text-[#999999] focus:border-[#296BA6] focus:ring-1 focus:ring-[#296BA6] transition-colors"
