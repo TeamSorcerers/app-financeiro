@@ -58,27 +58,20 @@ export async function POST (request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Obter o grupo pessoal do usuário
-    const group = await prisma.financialGroup.findFirst({ where: { members: { some: { userId: session.user.userId, isOwner: true } } } });
+    const { groupId } = data;
+
+    const group = await prisma.financialGroup.findFirst({
+      where: {
+        id: groupId,
+        members: { some: { userId: session.user.userId } },
+      },
+    });
 
     if (!group) {
       return Response.json({ error: "Grupo não encontrado" }, { status: 404 });
     }
 
-    // Verificar se o usuário tem acesso ao grupo
-    const groupMember = await prisma.financialGroupMember.findFirst({
-      where: {
-        userId: session.user.userId,
-        financialGroupId: group.id,
-      },
-    });
-
-    if (!groupMember) {
-      return Response.json({ error: "Acesso negado ao grupo financeiro" }, { status: 403 });
-    }
-
     // Verificar se a categoria existe (se fornecida)
-    /*
     if (data.categoryId) {
       const category = await prisma.financialCategory.findUnique({ where: { id: data.categoryId } });
 
@@ -86,7 +79,6 @@ export async function POST (request: NextRequest) {
         return Response.json({ error: "Categoria não encontrada" }, { status: 404 });
       }
     }
-    */
 
     const transaction = await prisma.transaction.create({
       data: {
@@ -94,6 +86,7 @@ export async function POST (request: NextRequest) {
         type: data.type,
         description: data.description,
         transactionDate: new Date(data.transactionDate),
+        categoryId: data.categoryId,
         createdById: session.user.userId,
         groupId: group.id,
       },
