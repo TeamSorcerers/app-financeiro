@@ -58,6 +58,7 @@ export async function POST (req: NextRequest) {
             isOwner: true,
           },
         },
+        type: "PERSONAL",
         createdBy: { connect: { id: user.id } },
       },
     });

@@ -9,7 +9,6 @@ export async function GET () {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  // Busca o grupo pessoal do usuário
   const group = await prisma.financialGroup.findFirst({
     where: {
       members: {
@@ -18,6 +17,7 @@ export async function GET () {
           isOwner: true,
         },
       },
+      type: "PERSONAL",
     },
     include: { members: true },
   });
@@ -26,13 +26,11 @@ export async function GET () {
     return Response.json({ error: "Grupo pessoal não encontrado" }, { status: HTTP_STATUS.NOT_FOUND });
   }
 
-  // Busca todas as transações do grupo
   const transactions = await prisma.transaction.findMany({
     where: { groupId: group.id },
     select: { amount: true, type: true },
   });
 
-  // Calcula saldo: receitas - despesas
   const saldo = transactions.reduce((acc, t) => {
     if (t.type === "INCOME") {
       return acc + t.amount;

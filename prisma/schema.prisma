@@ -12,6 +12,18 @@ enum TransactionType {
   EXPENSE
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum GroupType {
+  PERSONAL
+  COLLABORATIVE
+}
+
 model User {
   id Int @id @default(autoincrement())
 
@@ -26,6 +38,8 @@ model User {
   groupMembers FinancialGroupMember[]
 
   transactions Transaction[]
+  sentInvitations GroupInvitation[] @relation("SentInvitations")
+  receivedInvitations GroupInvitation[] @relation("ReceivedInvitations")
 }
 
 model FinancialGroup {
@@ -39,9 +53,10 @@ model FinancialGroup {
 
   createdBy User @relation(fields: [createdById], references: [id])
   createdById Int
-
+  type GroupType @default(COLLABORATIVE)
   members FinancialGroupMember[]
   transactions Transaction[]
+  invitations GroupInvitation[]
 }
 
 model FinancialGroupMember {
@@ -60,6 +75,24 @@ model FinancialGroupMember {
   balance Float @default(0)
 
   @@unique([userId, financialGroupId])
+}
+
+model GroupInvitation {
+  id Int @id @default(autoincrement())
+
+  sender User @relation("SentInvitations", fields: [senderId], references: [id])
+  senderId Int
+
+  receiver User @relation("ReceivedInvitations", fields: [receiverId], references: [id])
+  receiverId Int
+
+  group FinancialGroup @relation(fields: [groupId], references: [id])
+  groupId Int
+
+  status InvitationStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model FinancialCategory {

@@ -8,6 +8,8 @@ export const TransactionSchema = z.object({
   description: z.string().max(MAX_LENGTH_DESCRIPTION, `Descrição deve ter no máximo ${MAX_LENGTH_DESCRIPTION} caracteres`).
     optional(),
   transactionDate: z.iso.datetime({ local: true, error: "Data inválida" }),
+  categoryId: z.number().optional(),
+  groupId: z.number({ error: "ID do grupo é obrigatório" }),
 });
 
 export type TransactionSchemaData = z.infer<typeof TransactionSchema>;
