@@ -205,29 +205,35 @@ export default function GroupPage() {
       setInviteStatus("Informe um e-mail válido.");
       return;
     }
+
     setInviteStatus("Enviando...");
+
     try {
-      const res = await fetch(`/api/group/${encodeURIComponent(String(idParam))}/member`, {
+      const res = await fetch("/api/group/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: inviteEmail.trim() }),
+        body: JSON.stringify({
+          email: inviteEmail.trim().toLowerCase(),
+          groupId: Number(idParam),
+        }),
       });
 
+      // Mesmo que o usuário não exista, a API responde com mensagem genérica
       const json = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        setInviteStatus("Convite enviado / membro adicionado.");
+        setInviteStatus("Seu convite foi enviado, caso exista um usuário com este endereço de e-mail, ele será notificado.");
         setInviteEmail("");
-        setInviteModalOpen(false); // fechar modal no sucesso
+        setInviteModalOpen(false);
+        // atualiza lista de membros caso tenha sido criado convite para usuário existente
         await refreshGroup();
       } else {
-        setInviteStatus(json?.error || "Erro ao convidar usuário.");
+        setInviteStatus(json?.error || "Erro ao enviar convite.");
       }
     } catch (err: unknown) {
       setInviteStatus(err instanceof Error ? err.message : "Erro de conexão");
     } finally {
-      // limpa mensagem após alguns segundos
       setTimeout(() => setInviteStatus(null), 3500);
     }
   }

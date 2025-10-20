@@ -228,6 +228,8 @@ export default function HomePage () {
   const [ creating, setCreating ] = useState(false);
   const [ name, setName ] = useState("");
   const [ description, setDescription ] = useState("");
+  const [ invites, setInvites ] = useState<{ id: number; sender: { id: number; name: string; email: string }; group: { id: number; name: string }; status: string; createdAt: string }[] | null>(null);
+  const [ invitesLoading, setInvitesLoading ] = useState(false);
 
   const router = useRouter();
 
@@ -238,71 +240,105 @@ export default function HomePage () {
     }
   }, [ sessionStatus, router ]);
 
-  // carregamento de grupos
-  useEffect(() => {
-    let mounted = true;
+  // carregamento de grupos reutilizável (mantém grupo pessoal no topo)
+  async function fetchGroups () {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/group");
 
-    async function loadGroups () {
-      if (!mounted) {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+
+        setError(body?.error || "Erro ao buscar grupos");
+        setGroups([]);
+
         return;
       }
-      setLoading(true);
-      setError(null);
 
-      try {
-        const res = await fetch("/api/group");
+      const data = await res.json();
 
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-
-          if (!mounted) {
-            return;
-          }
-          setError(body?.error || "Erro ao buscar grupos");
-          setGroups([]);
-
-          return;
-        }
-
-        const data = await res.json();
-
-        if (!mounted) {
-          return;
-        }
-
-        if (!Array.isArray(data)) {
-          setError("Resposta inválida do servidor");
-          setGroups([]);
-
-          return;
-        }
-
-        setGroups(data);
-      } catch (err: unknown) {
-        if (!mounted) {
-          return;
-        }
-        setError(getErrorMessage(err) || "Erro de conexão");
+      if (!Array.isArray(data)) {
+        setError("Resposta inválida do servidor");
         setGroups([]);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
 
-    // somente buscar se autenticado
+        return;
+      }
+
+      // tenta obter o grupo pessoal para fixá‑lo no topo (se existir)
+      try {
+        const meRes = await fetch("/api/group/me", { credentials: "include" });
+
+        if (meRes.ok) {
+          const meJson = await meRes.json().catch(() => ({}));
+          const personalId = meJson?.data?.id;
+
+          if (personalId) {
+            const SORT_PERSONAL_FIRST = -1;
+            const SORT_PERSONAL_LAST = 1;
+
+            // mover o personal para o início preservando ordem dos demais
+            data.sort((a: { id: number }, b: { id: number }) => {
+              if (a.id === personalId) {
+                return SORT_PERSONAL_FIRST;
+              }
+              if (b.id === personalId) {
+                return SORT_PERSONAL_LAST;
+              }
+
+              return 0;
+            });
+          }
+        }
+      } catch {
+        // se falhar ao buscar /me, não bloqueia o carregamento de grupos
+      }
+
+      setGroups(data);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || "Erro de conexão");
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // somente buscar se autenticado
+  useEffect(() => {
     if (sessionStatus === "authenticated") {
-      loadGroups();
+      fetchGroups();
     } else {
-      // limpar quando não autenticado
       setGroups(null);
     }
+  }, [ sessionStatus ]); // dependência intencional
 
-    return () => {
-      mounted = false;
-    };
-  }, [ sessionStatus ]); // dependência intencional: re-executa quando status muda
+  async function fetchInvites () {
+    setInvitesLoading(true);
+    try {
+      const res = await fetch("/api/group/invite", { credentials: "include" });
+
+      if (!res.ok) {
+        // não fatal — mostra vazio
+        setInvites([]);
+
+        return;
+      }
+      const json = await res.json().catch(() => ({}));
+
+      setInvites(Array.isArray(json?.invitations) ? json.invitations : []);
+    } catch {
+      setInvites([]);
+    } finally {
+      setInvitesLoading(false);
+    }
+  }
+
+  // Carrega convites quando a aba "requests" for ativada
+  useEffect(() => {
+    if (activeTab === "requests" && sessionStatus === "authenticated") {
+      fetchInvites();
+    }
+  }, [ activeTab, sessionStatus ]);
 
   // Funções de criação e navegação (mantidas simples)
   async function handleCreate (e?: React.FormEvent) {
@@ -355,6 +391,35 @@ export default function HomePage () {
       setError(msg || "Erro ao criar grupo");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function respondInvite (id: number, inviteStatus: "ACCEPTED" | "REJECTED") {
+    try {
+      const res = await fetch("/api/group/invite", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id, status: inviteStatus }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+
+        setError(body?.error || "Erro ao responder convite");
+
+        return;
+      }
+
+      // Atualiza lista localmente
+      setInvites((prev) => (prev ? prev.filter((i) => i.id !== id) : prev));
+
+      // Se aceitou, recarrega grupos para refletir o novo membro (e manter personal no topo)
+      if (inviteStatus === "ACCEPTED") {
+        await fetchGroups();
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro de conexão");
     }
   }
 
@@ -411,8 +476,49 @@ export default function HomePage () {
 
         {activeTab === "requests" &&
           <div className="bg-[#2A2D34] rounded-xl p-5 shadow-sm hover:shadow-md border border-[#00000033]">
-            <h3 className="text-[#A3D5FF] text-base font-semibold">Solicitações</h3>
-            <p className="mt-2 text-sm text-[#E0E0E0]/90">Aqui aparecerão as solicitações e convites de grupos. No momento não há solicitações.</p>
+            <h3 className="text-[#A3D5FF] text-base font-semibold mb-3">Solicitações</h3>
+
+            {invitesLoading && <p className="text-sm text-[#E0E0E0]/80">Carregando solicitações...</p>}
+
+            {!invitesLoading && (!invites || invites.length === 0) &&
+              <p className="mt-2 text-sm text-[#E0E0E0]/90">No momento não há solicitações.</p>
+            }
+
+            {!invitesLoading && invites && invites.length > 0 &&
+              <div className="space-y-3">
+                {invites.map((inv) => <div key={inv.id} className="flex items-center justify-between gap-3 p-3 bg-[#1F2226] rounded-md">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-[#303538] flex items-center justify-center text-[#A3D5FF] font-semibold">
+                      {inv.sender.name ?
+                          inv.sender.name.split(/\s+/u).map((p) => p[0]).
+                            slice(0, INITIALS_MAX).
+                            join("").
+                            toUpperCase() :
+                          inv.sender.email.slice(0, INITIALS_MAX).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[#E0E0E0] truncate">{inv.sender.name} convidou você</div>
+                      <div className="text-xs text-[#E0E0E0]/70 truncate">Grupo: {inv.group.name}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => respondInvite(inv.id, "REJECTED")}
+                      className="px-3 py-1.5 text-sm rounded-md bg-transparent border border-[#00000033] text-[#E0E0E0] hover:bg-[#2A2D34]"
+                    >
+                      Ignorar
+                    </button>
+                    <button
+                      onClick={() => respondInvite(inv.id, "ACCEPTED")}
+                      className="px-3 py-1.5 text-sm rounded-md bg-gradient-to-br from-[#6FB1FC] to-[#4EA8F8] text-white font-semibold"
+                    >
+                      Aceitar
+                    </button>
+                  </div>
+                </div>)}
+              </div>
+            }
           </div>
         }
 
