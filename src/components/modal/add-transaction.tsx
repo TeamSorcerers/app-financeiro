@@ -10,6 +10,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 
 interface AddTransactionProps {
+  groupId: number;
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
@@ -24,12 +25,13 @@ function getDefaultDate () {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
-export default function AddTransaction ({ isOpen, onClose, onSuccess }: AddTransactionProps) {
+export default function AddTransaction ({ groupId, isOpen, onClose, onSuccess }: AddTransactionProps) {
   const {
     register,
     handleSubmit,
     reset,
     setError,
+    setValue,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<TransactionSchemaData>({
@@ -40,6 +42,8 @@ export default function AddTransaction ({ isOpen, onClose, onSuccess }: AddTrans
       transactionDate: getDefaultDate(),
     },
   });
+
+  setValue("groupId", groupId);
 
   useEffect(() => {
     if (isOpen) {
