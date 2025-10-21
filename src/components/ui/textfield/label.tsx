@@ -1,36 +1,17 @@
-import Tooltip from "@/components/ui/textfield/tooltip";
-
-export interface TextLabelProps {
-  id: string;
+export interface LabelProps {
+  htmlFor: string;
   children: React.ReactNode;
-
   className?: string;
-  isRequired?: boolean;
-  tooltipContent?: React.ReactNode;
 }
 
-export default function TextLabel ({ id, children, className, isRequired, tooltipContent }: TextLabelProps) {
+export default function Label ({ htmlFor, children, className }: LabelProps) {
   return (
     <label
-      htmlFor={id}
-      className={`
-        text-base
-        font-medium
-        text-[#d3d3d3]
-        flex
-        items-center
-        ${className ?? ""}
-    `}
+      className={`font-raleway font-medium text-md text-[#4a4a4a] mb-2 select-none ${className}`}
+      htmlFor={htmlFor}
+      tabIndex={-1}
     >
       {children}
-      {isRequired && <span className="text-red-500">*</span>}
-      {tooltipContent &&
-        <div className="ml-1">
-          <Tooltip>
-            {tooltipContent}
-          </Tooltip>
-        </div>
-      }
     </label>
   );
 }

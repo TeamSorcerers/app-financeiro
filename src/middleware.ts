@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export default auth((req) => {
   const { nextUrl } = req;
-  const isLoggedIn = req.auth !== null;
+  const isLoggedIn = false; // req.auth !== null;
 
   // Rotas de autenticação (login/register)
   const isAuthRoute = nextUrl.pathname.startsWith("/login") ||
