@@ -12,6 +12,14 @@ enum TransactionType {
   EXPENSE
 }
 
+enum TransactionStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+  PARTIALLY_PAID
+}
+
 enum InvitationStatus {
   PENDING
   ACCEPTED
@@ -24,108 +32,207 @@ enum GroupType {
   COLLABORATIVE
 }
 
+enum PaymentMethodType {
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  CASH
+  BANK_TRANSFER
+  CHECK
+  OTHER
+}
+
+enum CardType {
+  CREDIT
+  DEBIT
+  BOTH
+}
+
+enum RecurringFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
 model User {
-  id Int @id @default(autoincrement())
-
-  email String @unique @db.VarChar(254)
-  name String @db.VarChar(100)
-  password String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  groups FinancialGroup[]
-  groupMembers FinancialGroupMember[]
-
-  transactions Transaction[]
-  sentInvitations GroupInvitation[] @relation("SentInvitations")
-  receivedInvitations GroupInvitation[] @relation("ReceivedInvitations")
+  id                    Int                    @id @default(autoincrement())
+  email                 String                 @unique @db.VarChar(254)
+  name                  String                 @db.VarChar(100)
+  password              String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  bankAccounts          BankAccount[]
+  creditCards           CreditCard[]
+  customCategories      FinancialCategory[]
+  groups                FinancialGroup[]
+  groupMembers          FinancialGroupMember[]
+  receivedInvitations   GroupInvitation[]      @relation("ReceivedInvitations")
+  sentInvitations       GroupInvitation[]      @relation("SentInvitations")
+  paymentMethods        PaymentMethod[]
+  recurringTransactions RecurringTransaction[]
+  transactions          Transaction[]
 }
 
 model FinancialGroup {
-  id Int @id @default(autoincrement())
-
-  name String @db.VarChar(100)
-  description String @db.VarChar(150)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  createdBy User @relation(fields: [createdById], references: [id])
-  createdById Int
-  type GroupType @default(COLLABORATIVE)
-  members FinancialGroupMember[]
-  transactions Transaction[]
-  invitations GroupInvitation[]
+  id                    Int                    @id @default(autoincrement())
+  name                  String                 @db.VarChar(100)
+  description           String                 @db.VarChar(150)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  createdById           Int
+  type                  GroupType              @default(COLLABORATIVE)
+  createdBy             User                   @relation(fields: [createdById], references: [id])
+  members               FinancialGroupMember[]
+  invitations           GroupInvitation[]
+  recurringTransactions RecurringTransaction[]
+  transactions          Transaction[]
 }
 
 model FinancialGroupMember {
-  id Int @id @default(autoincrement())
-
-  user User @relation(fields: [userId], references: [id])
-  userId Int
-
-  financialGroup FinancialGroup @relation(fields: [financialGroupId], references: [id])
+  id               Int            @id @default(autoincrement())
+  userId           Int
   financialGroupId Int
-
-  joinedAt DateTime @default(now())
-
-  isOwner Boolean @default(false)
-
-  balance Float @default(0)
+  joinedAt         DateTime       @default(now())
+  isOwner          Boolean        @default(false)
+  balance          Float          @default(0)
+  financialGroup   FinancialGroup @relation(fields: [financialGroupId], references: [id])
+  user             User           @relation(fields: [userId], references: [id])
 
   @@unique([userId, financialGroupId])
 }
 
 model GroupInvitation {
-  id Int @id @default(autoincrement())
-
-  sender User @relation("SentInvitations", fields: [senderId], references: [id])
-  senderId Int
-
-  receiver User @relation("ReceivedInvitations", fields: [receiverId], references: [id])
+  id         Int              @id @default(autoincrement())
+  senderId   Int
   receiverId Int
-
-  group FinancialGroup @relation(fields: [groupId], references: [id])
-  groupId Int
-
-  status InvitationStatus @default(PENDING)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  groupId    Int
+  status     InvitationStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  group      FinancialGroup   @relation(fields: [groupId], references: [id])
+  receiver   User             @relation("ReceivedInvitations", fields: [receiverId], references: [id])
+  sender     User             @relation("SentInvitations", fields: [senderId], references: [id])
 }
 
 model FinancialCategory {
-  id Int @id @default(autoincrement())
-
-  name String @db.VarChar(100)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  transactions Transaction[]
+  id                    Int                    @id @default(autoincrement())
+  name                  String                 @db.VarChar(100)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  isGlobal              Boolean                @default(true)
+  userId                Int?
+  user                  User?                  @relation(fields: [userId], references: [id])
+  recurringTransactions RecurringTransaction[]
+  transactions          Transaction[]
 }
 
 model Transaction {
-  id Int @id @default(autoincrement())
+  id                     Int                   @id @default(autoincrement())
+  amount                 Float
+  type                   TransactionType
+  status                 TransactionStatus     @default(PENDING)
+  description            String?               @db.VarChar(255)
+  date                   DateTime              @default(now())
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  transactionDate        DateTime
+  dueDate                DateTime?
+  paidAt                 DateTime?
+  isPaid                 Boolean               @default(false)
+  createdById            Int
+  groupId                Int
+  categoryId             Int?
+  bankAccountId          Int?
+  creditCardId           Int?
+  installmentNumber      Int?
+  paymentMethodId        Int?
+  recurringTransactionId Int?
+  totalInstallments      Int?
+  bankAccount            BankAccount?          @relation(fields: [bankAccountId], references: [id])
+  category               FinancialCategory?    @relation(fields: [categoryId], references: [id])
+  createdBy              User                  @relation(fields: [createdById], references: [id])
+  creditCard             CreditCard?           @relation(fields: [creditCardId], references: [id])
+  group                  FinancialGroup        @relation(fields: [groupId], references: [id])
+  paymentMethod          PaymentMethod?        @relation(fields: [paymentMethodId], references: [id])
+  recurringTransaction   RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id])
+}
 
-  amount Float
-  type TransactionType
+model PaymentMethod {
+  id                    Int                    @id @default(autoincrement())
+  name                  String                 @db.VarChar(100)
+  type                  PaymentMethodType
+  description           String?                @db.VarChar(255)
+  isActive              Boolean                @default(true)
+  userId                Int
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  user                  User                   @relation(fields: [userId], references: [id])
+  recurringTransactions RecurringTransaction[]
+  transactions          Transaction[]
+}
 
-  description String? @db.VarChar(255)
+model BankAccount {
+  id                    Int                    @id @default(autoincrement())
+  name                  String                 @db.VarChar(100)
+  bank                  String                 @db.VarChar(100)
+  balance               Float                  @default(0)
+  isActive              Boolean                @default(true)
+  userId                Int
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  user                  User                   @relation(fields: [userId], references: [id])
+  creditCards           CreditCard[]
+  recurringTransactions RecurringTransaction[]
+  transactions          Transaction[]
+}
 
-  date DateTime @default(now())
+model CreditCard {
+  id                    Int                    @id @default(autoincrement())
+  name                  String                 @db.VarChar(100)
+  last4Digits           String                 @db.VarChar(4)
+  brand                 String                 @db.VarChar(50)
+  type                  CardType
+  creditLimit           Float?
+  closingDay            Int?
+  dueDay                Int?
+  isActive              Boolean                @default(true)
+  userId                Int
+  bankAccountId         Int?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  bankAccount           BankAccount?           @relation(fields: [bankAccountId], references: [id])
+  user                  User                   @relation(fields: [userId], references: [id])
+  recurringTransactions RecurringTransaction[]
+  transactions          Transaction[]
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  transactionDate DateTime
-
-  createdBy User @relation(fields: [createdById], references: [id])
-  createdById Int
-
-  group FinancialGroup @relation(fields: [groupId], references: [id])
-  groupId Int
-
-  category FinancialCategory? @relation(fields: [categoryId], references: [id])
-  categoryId Int?
+model RecurringTransaction {
+  id                    Int                @id @default(autoincrement())
+  name                  String             @db.VarChar(100)
+  description           String?            @db.VarChar(255)
+  amount                Float
+  type                  TransactionType
+  frequency             RecurringFrequency
+  totalInstallments     Int?
+  currentInstallment    Int                @default(1)
+  startDate             DateTime
+  endDate               DateTime?
+  nextExecutionDate     DateTime
+  isActive              Boolean            @default(true)
+  userId                Int
+  categoryId            Int?
+  paymentMethodId       Int?
+  bankAccountId         Int?
+  creditCardId          Int?
+  groupId               Int
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  bankAccount           BankAccount?       @relation(fields: [bankAccountId], references: [id])
+  category              FinancialCategory? @relation(fields: [categoryId], references: [id])
+  creditCard            CreditCard?        @relation(fields: [creditCardId], references: [id])
+  group                 FinancialGroup     @relation(fields: [groupId], references: [id])
+  paymentMethod         PaymentMethod?     @relation(fields: [paymentMethodId], references: [id])
+  user                  User               @relation(fields: [userId], references: [id])
+  generatedTransactions Transaction[]
 }
