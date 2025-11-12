@@ -4,62 +4,6 @@ import { prisma } from "@/lib/shared/prisma";
 import { TransactionSchema } from "@/lib/shared/schemas/transaction";
 import { NextRequest } from "next/server";
 
-function calculateDueDate (creditCardId: number | undefined, transactionDate: Date, dueDate?: Date) {
-  if (!creditCardId || dueDate) {
-    return dueDate ? new Date(dueDate) : null;
-  }
-
-  return null; // Será calculado depois
-}
-
-async function getCreditCardDueDate (creditCardId: number, transactionDate: Date) {
-  const creditCard = await prisma.creditCard.findUnique({
-    where: { id: creditCardId },
-    select: { dueDay: true, closingDay: true },
-  });
-
-  if (!creditCard?.dueDay) {
-    return null;
-  }
-
-  const currentMonth = transactionDate.getMonth();
-  const currentYear = transactionDate.getFullYear();
-  const isAfterClosing = creditCard.closingDay ? transactionDate.getDate() > creditCard.closingDay : false;
-  const dueMonth = isAfterClosing ? currentMonth + 1 : currentMonth;
-
-  return new Date(currentYear, dueMonth, creditCard.dueDay);
-}
-
-function determineTransactionStatus (statusInput: string | undefined): "PENDING" | "PAID" | "OVERDUE" | "CANCELLED" | "PARTIALLY_PAID" {
-  const validStatuses = [ "PENDING", "PAID", "OVERDUE", "CANCELLED", "PARTIALLY_PAID" ] as const;
-
-  if (statusInput && validStatuses.includes(statusInput as typeof validStatuses[number])) {
-    return statusInput as typeof validStatuses[number];
-  }
-
-  return "PENDING";
-}
-
-function determineIsPaid (transactionStatus: string, isPaidInput: boolean | undefined) {
-  if (transactionStatus === "PAID") {
-    return true;
-  }
-
-  return isPaidInput || false;
-}
-
-function determinePaidAt (isPaid: boolean, transactionStatus: string, paidAtInput?: Date) {
-  if (!isPaid && transactionStatus !== "PAID") {
-    return null;
-  }
-
-  if (paidAtInput) {
-    return new Date(paidAtInput);
-  }
-
-  return new Date();
-}
-
 export async function GET () {
   try {
     const session = await auth();
@@ -137,28 +81,48 @@ export async function POST (request: NextRequest) {
       }
     }
 
-    // Calcular data de vencimento
-    let calculatedDueDate = calculateDueDate(creditCardId, new Date(data.transactionDate), dueDate);
+    // Calcular data de vencimento automaticamente se for cartão de crédito
+    let calculatedDueDate = dueDate ? new Date(dueDate) : null;
 
     if (creditCardId && !calculatedDueDate) {
-      calculatedDueDate = await getCreditCardDueDate(creditCardId, new Date(data.transactionDate));
+      const creditCard = await prisma.creditCard.findUnique({
+        where: { id: creditCardId },
+        select: { dueDay: true, closingDay: true },
+      });
+
+      if (creditCard && creditCard.dueDay) {
+        const transactionDate = new Date(data.transactionDate);
+        const currentMonth = transactionDate.getMonth();
+        const currentYear = transactionDate.getFullYear();
+
+        // Se a transação foi depois do fechamento, vencimento será no próximo mês
+        const isAfterClosing = creditCard.closingDay ? transactionDate.getDate() > creditCard.closingDay : false;
+        const dueMonth = isAfterClosing ? currentMonth + 1 : currentMonth;
+
+        calculatedDueDate = new Date(currentYear, dueMonth, creditCard.dueDay);
+      }
     }
 
-    // Determinar status e isPaid
-    const transactionStatus = determineTransactionStatus(data.status);
-    const isPaid = determineIsPaid(transactionStatus, data.isPaid);
-    const paidAt = determinePaidAt(isPaid, transactionStatus, data.paidAt);
+    // Determinar status inicial baseado no tipo e método de pagamento
+    let initialStatus = data.status || "PENDING";
+    let initialIsPaid = data.isPaid || data.status === "PAID";
+
+    // Se for receita e não for cartão de crédito, marcar como pago automaticamente
+    if (data.type === "INCOME" && !creditCardId) {
+      initialStatus = "PAID";
+      initialIsPaid = true;
+    }
 
     const transaction = await prisma.transaction.create({
       data: {
         amount: data.amount,
         type: data.type,
-        status: transactionStatus,
+        status: initialStatus,
         description: data.description,
         transactionDate: new Date(data.transactionDate),
         dueDate: calculatedDueDate,
-        paidAt,
-        isPaid,
+        paidAt: initialIsPaid ? new Date() : null,
+        isPaid: initialIsPaid,
         categoryId: data.categoryId,
         createdById: session.user.userId,
         groupId: group.id,
