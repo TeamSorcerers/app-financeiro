@@ -1,9 +1,9 @@
 "use client";
 
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/card/Card";
 import TextField from "@/components/ui/textfield/TextField";
 import Typography, { TypographyLevel } from "@/components/ui/Typography";
+import Button from "@/components/ui/UIButton";
 import { AuthLoginSchema, type AuthLoginSchemaData } from "@/lib/shared/schemas/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";

@@ -1,9 +1,9 @@
 "use client";
 
-import Button from "@/components/ui/Button";
 import Card from "@/components/ui/card/Card";
 import TextField from "@/components/ui/textfield/TextField";
 import Typography, { TypographyLevel } from "@/components/ui/Typography";
+import Button from "@/components/ui/UIButton";
 import gateways from "@/lib/client/gateways";
 import { HTTP_STATUS } from "@/lib/shared/constants";
 import { AuthRegisterSchema, type AuthRegisterSchemaData } from "@/lib/shared/schemas/auth";

@@ -1,6 +1,6 @@
 import { HTMLInputTypeAttribute } from "react";
 import ErrorToast from "./ErrorToast";
-import Label from "./Label";
+import Label from "./TextLabel";
 
 export interface TextFieldClassNames {
   container?: string;
