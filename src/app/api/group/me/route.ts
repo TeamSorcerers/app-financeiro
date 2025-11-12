@@ -1,3 +1,4 @@
+import logger from "@/lib/server/logger";
 import { auth } from "@/lib/shared/auth";
 import { HTTP_STATUS } from "@/lib/shared/constants";
 import { prisma } from "@/lib/shared/prisma";
@@ -19,19 +20,31 @@ export async function GET () {
       },
       type: "PERSONAL",
     },
-    include: { members: true },
+    include: {
+      members: true,
+      transactions: {
+        select: {
+          id: true,
+          amount: true,
+          type: true,
+          isPaid: true,
+          description: true,
+        },
+      },
+    },
   });
 
   if (!group) {
     return Response.json({ error: "Grupo pessoal não encontrado" }, { status: HTTP_STATUS.NOT_FOUND });
   }
 
-  const transactions = await prisma.transaction.findMany({
-    where: { groupId: group.id },
-    select: { amount: true, type: true },
-  });
+  // Calcular saldo considerando APENAS transações pagas para saldo real
+  const saldo = group.transactions.reduce((acc, t) => {
+    // Pular transações não pagas no cálculo do saldo real
+    if (!t.isPaid) {
+      return acc;
+    }
 
-  const saldo = transactions.reduce((acc, t) => {
     if (t.type === "INCOME") {
       return acc + t.amount;
     }
@@ -41,6 +54,8 @@ export async function GET () {
 
     return acc;
   }, 0);
+
+  logger.info(`Saldo calculado para grupo pessoal ${group.name} (ID: ${group.id}): ${saldo}. Total de transações: ${group.transactions.length}`);
 
   return Response.json({
     data: {

@@ -156,6 +156,18 @@ export default function AddTransaction ({ groupId, isOpen, onClose, onSuccess }:
 
       if (!response.ok) {
         if (response.status === HTTP_STATUS.BAD_REQUEST) {
+          // Erro de limite do cartão
+          if (result.details?.cardName) {
+            const { cardName, availableLimit, requiredAmount } = result.details;
+
+            setError("root", {
+              type: "server",
+              message: `Limite insuficiente no cartão ${cardName}. Disponível: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(availableLimit)}. Necessário: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(requiredAmount)}`,
+            });
+
+            return;
+          }
+
           setError("root", {
             type: "server",
             message: result.error || "Dados inválidos",

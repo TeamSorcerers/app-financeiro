@@ -104,12 +104,14 @@ async function createMirroredPersonalTransaction (
   });
 
   if (!personalGroup) {
+    logger.warn(`Grupo pessoal não encontrado para usuário ${userId}`);
+
     return;
   }
 
   const paidAt = data.isPaid ? new Date() : null;
 
-  await prisma.transaction.create({
+  const mirroredTransaction = await prisma.transaction.create({
     data: {
       amount: data.amount,
       type: "EXPENSE",
@@ -126,9 +128,13 @@ async function createMirroredPersonalTransaction (
       bankAccountId: data.bankAccountId,
       paymentMethodId: data.paymentMethodId,
     },
+    include: {
+      category: true,
+      group: true,
+    },
   });
 
-  logger.info(`Transação espelhada criada no grupo pessoal para usuário ${userId}`);
+  logger.info(`Transação espelhada criada no grupo pessoal ${personalGroup.name} (ID: ${personalGroup.id}) para usuário ${userId}. Transação ID: ${mirroredTransaction.id}, Valor: ${mirroredTransaction.amount}, Status: ${mirroredTransaction.status}, isPaid: ${mirroredTransaction.isPaid}`);
 }
 
 export async function POST (request: NextRequest) {
@@ -168,6 +174,44 @@ export async function POST (request: NextRequest) {
 
       if (!category) {
         return Response.json({ error: "Categoria não encontrada" }, { status: 404 });
+      }
+    }
+
+    // Validar limite do cartão de crédito se for despesa
+    if (creditCardId && data.type === "EXPENSE") {
+      const creditCard = await prisma.creditCard.findUnique({
+        where: { id: creditCardId },
+        include: {
+          transactions: {
+            where: {
+              type: "EXPENSE",
+              status: { "in": [ "PENDING", "PAID" ] },
+            },
+          },
+        },
+      });
+
+      if (!creditCard) {
+        return Response.json({ error: "Cartão de crédito não encontrado" }, { status: 404 });
+      }
+
+      if (creditCard.type === "CREDIT" || creditCard.type === "BOTH") {
+        // Calcular saldo usado no cartão
+        const usedAmount = creditCard.transactions.reduce((sum, t) => sum + t.amount, 0);
+        const availableLimit = (creditCard.creditLimit || 0) - usedAmount;
+
+        if (data.amount > availableLimit) {
+          return Response.json({
+            error: "Limite do cartão insuficiente",
+            details: {
+              cardName: creditCard.name,
+              creditLimit: creditCard.creditLimit,
+              usedAmount,
+              availableLimit,
+              requiredAmount: data.amount,
+            },
+          }, { status: 400 });
+        }
       }
     }
 
@@ -233,7 +277,7 @@ export async function POST (request: NextRequest) {
           description: data.description,
           transactionDate: new Date(data.transactionDate),
           dueDate: calculatedDueDate,
-          isPaid: initialIsPaid,
+          isPaid: true,
           categoryId: data.categoryId,
           creditCardId: data.creditCardId,
           bankAccountId: data.bankAccountId,

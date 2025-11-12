@@ -27,6 +27,7 @@ interface CreditCard {
   name: string;
   last4Digits: string;
   brand: string;
+  type: "CREDIT" | "DEBIT" | "BOTH";
   creditLimit: number | null;
   closingDay: number | null;
   dueDay: number | null;
@@ -69,6 +70,10 @@ export default function FinancialSettingsPage() {
   const [ccClosingDay, setCcClosingDay] = useState("");
   const [ccDueDay, setCcDueDay] = useState("");
   const [ccError, setCcError] = useState("");
+
+  // Estado para detalhes do cartão
+  const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null);
+  const [cardUsage, setCardUsage] = useState<any[]>([]);
 
   useEffect(() => {
     if (sessionStatus === "unauthenticated") {
@@ -229,6 +234,21 @@ export default function FinancialSettingsPage() {
     }
   }
 
+  async function loadCardUsage(cardId: number) {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/credit-cards/${cardId}/usage`);
+      if (res.ok) {
+        const data = await res.json();
+        setCardUsage(data.usage || []);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar dados do cartão:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const tabs = [
     { id: "payment-methods" as TabType, label: "Métodos de Pagamento", icon: Wallet },
     { id: "bank-accounts" as TabType, label: "Contas Bancárias", icon: Building2 },
@@ -352,22 +372,39 @@ export default function FinancialSettingsPage() {
                   key={card.id}
                   className="p-4 bg-[#F0F0F3] rounded-xl shadow-[inset_2px_2px_4px_rgba(174,174,192,0.12)]"
                 >
-                  <div className="flex items-center gap-3">
-                    <CreditCardIcon size={20} className="text-[#4A90E2]" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-[#4a4a4a] truncate">{card.name}</p>
-                      <p className="text-xs text-[#6a6a6a]">
-                        {card.brand} •••• {card.last4Digits}
-                      </p>
-                      {card.creditLimit && (
-                        <p className="text-xs text-[#6a6a6a] mt-1">
-                          Limite:{" "}
-                          {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-                            card.creditLimit,
-                          )}
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <CreditCardIcon size={20} className="text-[#4A90E2]" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-[#4a4a4a] truncate">{card.name}</p>
+                        <p className="text-xs text-[#6a6a6a]">
+                          {card.brand} •••• {card.last4Digits}
                         </p>
-                      )}
+                      </div>
                     </div>
+                    
+                    {card.creditLimit && (card.type === "CREDIT" || card.type === "BOTH") && (
+                      <div className="border-t border-[#d0d0d0] pt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-[#6a6a6a]">Limite Total:</span>
+                          <span className="text-xs font-bold text-[#4a4a4a]">
+                            {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+                              card.creditLimit,
+                            )}
+                          </span>
+                        </div>
+                        
+                        <button
+                          onClick={() => {
+                            setSelectedCard(card);
+                            loadCardUsage(card.id);
+                          }}
+                          className="w-full text-xs text-[#4A90E2] hover:text-[#2E6FB7] transition mt-2"
+                        >
+                          Ver detalhes do uso
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
