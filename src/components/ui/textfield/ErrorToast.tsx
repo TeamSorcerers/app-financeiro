@@ -8,21 +8,22 @@ export default function ErrorToast ({ children }: ErrorToastProps) {
     <div
       className={`
         mt-2
-        p-3
-        rounded-xl
-        bg-[#ffe6e6]
-        text-red-600
-        text-sm animate-slide-down
-        shadow-[inset_3px_3px_6px_rgba(206,174,174,0.2),inset_-3px_-3px_6px_rgba(255,235,235,0.7)]
+        px-4
+        py-3
+        rounded-2xl
+        bg-[#ffd9d9]
+        text-[#c92a2a]
+        text-sm
+        shadow-[inset_2px_2px_4px_rgba(0,0,0,0.08),inset_-2px_-2px_4px_rgba(255,255,255,0.5)]
         border
-        border-red-200
-        flex flex-row items-center 
+        border-[#ffb3b3]/30
+        flex flex-row items-center gap-2
       `}
     >
-      <CircleAlert/>
+      <CircleAlert size={18} className="flex-shrink-0" />
       <Typography
         level={TypographyLevel.Body}
-        className="ml-2 text-red-600 font-raleway"
+        className="text-[#c92a2a] font-raleway leading-snug"
       >
         {children}
       </Typography>

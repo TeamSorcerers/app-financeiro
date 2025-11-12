@@ -1,11 +1,10 @@
 import logger from "@/lib/server/logger";
 import { auth } from "@/lib/shared/auth";
 import { prisma } from "@/lib/shared/prisma";
+import { RouteParams } from "@/lib/shared/types";
 import { NextRequest } from "next/server";
 
-interface PayTransactionContext {params: { id: string };}
-
-export async function PATCH (request: NextRequest, context: PayTransactionContext) {
+export async function PATCH (request: NextRequest, { params }: RouteParams<{ id: string }>) {
   try {
     const session = await auth();
 
@@ -13,7 +12,8 @@ export async function PATCH (request: NextRequest, context: PayTransactionContex
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const transactionId = parseInt(context.params.id);
+    const { id } = await params;
+    const transactionId = parseInt(id);
 
     if (isNaN(transactionId)) {
       return Response.json({ error: "ID da transação inválido" }, { status: 400 });
@@ -64,7 +64,7 @@ export async function PATCH (request: NextRequest, context: PayTransactionContex
   }
 }
 
-export async function DELETE (request: NextRequest, context: PayTransactionContext) {
+export async function DELETE (request: NextRequest, { params }: RouteParams<{ id: string }>) {
   try {
     const session = await auth();
 
@@ -72,7 +72,8 @@ export async function DELETE (request: NextRequest, context: PayTransactionConte
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const transactionId = parseInt(context.params.id);
+    const { id } = await params;
+    const transactionId = parseInt(id);
 
     if (isNaN(transactionId)) {
       return Response.json({ error: "ID da transação inválido" }, { status: 400 });

@@ -1,34 +1,49 @@
 import { auth } from "@/lib/shared/auth";
 import { prisma } from "@/lib/shared/prisma";
 import { CategorySchema } from "@/lib/shared/schemas/category";
+import { NextRequest } from "next/server";
 
-export async function GET () {
+export async function GET (request: NextRequest) {
   try {
     const session = await auth();
 
-    if (!session || !session.user || !session.user.id) {
+    if (session === null || !session.user) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const userId = parseInt(session.user.id);
+    // Obter groupId da query string
+    const url = new URL(request.url);
+    const groupIdParam = url.searchParams.get("groupId");
 
-    // Buscar categorias globais + categorias personalizadas do usuário
-    const [ globalCategories, userCategories ] = await Promise.all([
-      prisma.financialCategory.findMany({
-        where: { userId: null, isGlobal: true },
-        orderBy: { name: "asc" },
-      }),
-      prisma.financialCategory.findMany({
-        where: { userId, isGlobal: false },
-        orderBy: { name: "asc" },
-      }),
-    ]);
+    if (!groupIdParam) {
+      return Response.json({ error: "groupId é obrigatório" }, { status: 400 });
+    }
 
-    return Response.json({
-      global: globalCategories,
-      personal: userCategories,
-      all: [ ...globalCategories, ...userCategories ].sort((a, b) => a.name.localeCompare(b.name)),
-    }, { status: 200 });
+    const groupId = parseInt(groupIdParam);
+
+    if (isNaN(groupId)) {
+      return Response.json({ error: "groupId inválido" }, { status: 400 });
+    }
+
+    // Verificar se o usuário é membro do grupo
+    const isMember = await prisma.financialGroupMember.findFirst({
+      where: {
+        userId: session.user.userId,
+        financialGroupId: groupId,
+      },
+    });
+
+    if (!isMember) {
+      return Response.json({ error: "Acesso negado ao grupo" }, { status: 403 });
+    }
+
+    // Buscar categorias do grupo
+    const categories = await prisma.financialCategory.findMany({
+      where: { groupId },
+      orderBy: { name: "asc" },
+    });
+
+    return Response.json({ categories }, { status: 200 });
   } catch (error) {
     console.error("Erro ao buscar categorias:", error);
 
@@ -40,11 +55,10 @@ export async function POST (request: Request) {
   try {
     const session = await auth();
 
-    if (!session || !session.user || !session.user.id) {
+    if (session === null || !session.user) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const userId = parseInt(session.user.id);
     const body = await request.json();
     const { success, data, error } = await CategorySchema.safeParseAsync(body);
 
@@ -55,26 +69,31 @@ export async function POST (request: Request) {
       }, { status: 400 });
     }
 
-    const { name, isGlobal } = data;
+    const { name, groupId } = data;
+
+    // Verificar se o usuário é membro do grupo
+    const isMember = await prisma.financialGroupMember.findFirst({
+      where: {
+        userId: session.user.userId,
+        financialGroupId: groupId,
+      },
+    });
+
+    if (!isMember) {
+      return Response.json({ error: "Acesso negado ao grupo" }, { status: 403 });
+    }
 
     // Verificar se já existe uma categoria com o mesmo nome
-    const whereCondition = isGlobal ?
-        { name, userId: null, isGlobal: true } :
-        { name, userId, isGlobal: false };
-
-    const existingCategory = await prisma.financialCategory.findFirst({ where: whereCondition });
+    const existingCategory = await prisma.financialCategory.findFirst({ where: { name, groupId } });
 
     if (existingCategory) {
-      const scope = isGlobal ? "global" : "pessoal";
-
-      return Response.json({ error: `Categoria ${scope} já existe com esse nome` }, { status: 409 });
+      return Response.json({ error: "Já existe uma categoria com esse nome neste grupo" }, { status: 409 });
     }
 
     const newCategory = await prisma.financialCategory.create({
       data: {
         name,
-        userId: isGlobal ? null : userId,
-        isGlobal,
+        groupId,
       },
     });
 

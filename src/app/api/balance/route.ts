@@ -5,11 +5,11 @@ export async function GET () {
   try {
     const session = await auth();
 
-    if (!session || !session.user || !session.user.id) {
+    if (session === null || !session.user) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const userId = parseInt(session.user.id);
+    const { userId } = session.user;
 
     // Buscar todos os grupos do usuário (criados por ele + onde é membro)
     const userGroups = await prisma.financialGroupMember.findMany({

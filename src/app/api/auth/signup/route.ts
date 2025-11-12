@@ -6,6 +6,30 @@ import { hash } from "bcryptjs";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 
+const DEFAULT_CATEGORIES = [
+  "Salário",
+  "Freelance",
+  "Investimentos",
+  "Vendas",
+  "Rendimentos",
+  "Bonificações",
+  "Outros Ganhos",
+  "Alimentação",
+  "Transporte",
+  "Moradia",
+  "Saúde",
+  "Educação",
+  "Entretenimento",
+  "Compras",
+  "Serviços",
+  "Impostos",
+  "Seguros",
+  "Viagens",
+  "Pets",
+  "Doações",
+  "Outros Gastos",
+];
+
 export async function POST (req: NextRequest) {
   try {
     const body = await req.json();
@@ -60,6 +84,18 @@ export async function POST (req: NextRequest) {
         },
         type: "PERSONAL",
         createdBy: { connect: { id: user.id } },
+        categories: { create: DEFAULT_CATEGORIES.map((categoryName) => ({ name: categoryName })) },
+      },
+    });
+
+    // Criar método de pagamento padrão "Dinheiro"
+    await prisma.paymentMethod.create({
+      data: {
+        name: "Dinheiro",
+        type: "CASH",
+        description: "Pagamentos em espécie",
+        userId: user.id,
+        isActive: true,
       },
     });
 

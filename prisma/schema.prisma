@@ -83,6 +83,7 @@ model FinancialGroup {
   createdById           Int
   type                  GroupType              @default(COLLABORATIVE)
   createdBy             User                   @relation(fields: [createdById], references: [id])
+  categories            FinancialCategory[]
   members               FinancialGroupMember[]
   invitations           GroupInvitation[]
   recurringTransactions RecurringTransaction[]
@@ -120,11 +121,12 @@ model FinancialCategory {
   name                  String                 @db.VarChar(100)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
-  isGlobal              Boolean                @default(true)
-  userId                Int?
-  user                  User?                  @relation(fields: [userId], references: [id])
+  groupId               Int
+  group                 FinancialGroup         @relation(fields: [groupId], references: [id], onDelete: Cascade)
   recurringTransactions RecurringTransaction[]
   transactions          Transaction[]
+
+  users User[]
 }
 
 model Transaction {
@@ -150,7 +152,7 @@ model Transaction {
   recurringTransactionId Int?
   totalInstallments      Int?
   bankAccount            BankAccount?          @relation(fields: [bankAccountId], references: [id])
-  category               FinancialCategory?    @relation(fields: [categoryId], references: [id])
+  category               FinancialCategory?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdBy              User                  @relation(fields: [createdById], references: [id])
   creditCard             CreditCard?           @relation(fields: [creditCardId], references: [id])
   group                  FinancialGroup        @relation(fields: [groupId], references: [id])

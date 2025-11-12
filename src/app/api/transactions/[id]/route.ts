@@ -1,17 +1,8 @@
 import logger from "@/lib/server/logger";
 import { auth } from "@/lib/shared/auth";
 import { prisma } from "@/lib/shared/prisma";
-import { TransactionUpdateSchema } from "@/lib/shared/schemas/transaction";
 import { RouteParams } from "@/lib/shared/types";
 import { NextRequest } from "next/server";
-
-interface TransactionUpdateData {
-  amount?: number;
-  type?: "INCOME" | "EXPENSE";
-  description?: string;
-  transactionDate?: Date;
-  groupId?: number;
-}
 
 export async function GET (
   request: NextRequest,
@@ -81,71 +72,49 @@ export async function PUT (
       return Response.json({ error: "ID inválido" }, { status: 400 });
     }
 
-    // Verificar se a transação existe e pertence ao usuário
-    const existingTransaction = await prisma.transaction.findFirst({
-      where: {
-        id: transactionId,
-        createdById: session.user.userId,
-      },
+    // Verificar se a transação existe
+    const existingTransaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: { group: { include: { members: true } } },
     });
 
     if (!existingTransaction) {
       return Response.json({ error: "Transação não encontrada" }, { status: 404 });
     }
 
+    // Verificar se o usuário é o criador OU é admin do grupo
+    const isCreator = existingTransaction.createdById === session.user.userId;
+    const isGroupAdmin = existingTransaction.group.members.some(
+      (m) => m.userId === session.user.userId && m.isOwner,
+    );
+
+    if (!isCreator && !isGroupAdmin) {
+      return Response.json({ error: "Sem permissão para editar esta transação" }, { status: 403 });
+    }
+
     const body = await request.json();
-    const { success, data, error } = await TransactionUpdateSchema.safeParseAsync(body);
+    // Permitir atualização direta de campos específicos sem validação completa do schema
+    const updateData: Record<string, unknown> = {};
 
-    if (!success) {
-      return Response.json({
-        error: "Dados inválidos",
-        details: error.issues,
-      }, { status: 400 });
-    }
+    // Campos permitidos para atualização rápida
+    if (body.status !== undefined) {
+      updateData.status = body.status;
 
-    // Obter o grupo pessoal do usuário
-    const group = await prisma.financialGroup.findFirst({ where: { members: { some: { userId: session.user.userId, isOwner: true } } } });
-
-    if (!group) {
-      return Response.json({ error: "Grupo não encontrado" }, { status: 404 });
-    }
-
-    // Verificar se o usuário tem acesso ao grupo (se groupId foi fornecido)
-    const groupMember = await prisma.financialGroupMember.findFirst({
-      where: {
-        userId: session.user.userId,
-        financialGroupId: group.id,
-      },
-    });
-
-    if (!groupMember) {
-      return Response.json({ error: "Acesso negado ao grupo financeiro" }, { status: 403 });
-    }
-
-    // Verificar se a categoria existe (se categoryId foi fornecida)
-    /*
-    if (data.categoryId) {
-      const category = await prisma.financialCategory.findUnique({ where: { id: data.categoryId } });
-
-      if (!category) {
-        return Response.json({ error: "Categoria não encontrada" }, { status: 404 });
+      // Sincronizar isPaid com status
+      if (body.status === "PAID") {
+        updateData.isPaid = true;
+        updateData.paidAt = new Date();
+      } else if ([ "PENDING", "OVERDUE", "CANCELLED" ].includes(body.status)) {
+        updateData.isPaid = false;
+        updateData.paidAt = null;
+      } else if (body.status === "PARTIALLY_PAID") {
+        updateData.isPaid = false;
+        // Mantém paidAt se já existir
       }
     }
-    */
 
-    const updateData: TransactionUpdateData = {};
-
-    if (data.amount !== undefined) {
-      updateData.amount = data.amount;
-    }
-    if (data.type !== undefined) {
-      updateData.type = data.type;
-    }
-    if (data.description !== undefined) {
-      updateData.description = data.description;
-    }
-    if (data.transactionDate !== undefined) {
-      updateData.transactionDate = new Date(data.transactionDate);
+    if (body.categoryId !== undefined) {
+      updateData.categoryId = body.categoryId === "" ? null : body.categoryId;
     }
 
     const transaction = await prisma.transaction.update({
@@ -195,16 +164,24 @@ export async function DELETE (
       return Response.json({ error: "ID inválido" }, { status: 400 });
     }
 
-    // Verificar se a transação existe e pertence ao usuário
-    const existingTransaction = await prisma.transaction.findFirst({
-      where: {
-        id: transactionId,
-        createdById: session.user.userId,
-      },
+    // Verificar se a transação existe
+    const existingTransaction = await prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: { group: { include: { members: true } } },
     });
 
     if (!existingTransaction) {
       return Response.json({ error: "Transação não encontrada" }, { status: 404 });
+    }
+
+    // Verificar se o usuário é o criador OU é admin do grupo
+    const isCreator = existingTransaction.createdById === session.user.userId;
+    const isGroupAdmin = existingTransaction.group.members.some(
+      (m) => m.userId === session.user.userId && m.isOwner,
+    );
+
+    if (!isCreator && !isGroupAdmin) {
+      return Response.json({ error: "Sem permissão para excluir esta transação" }, { status: 403 });
     }
 
     await prisma.transaction.delete({ where: { id: transactionId } });

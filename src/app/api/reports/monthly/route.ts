@@ -1,20 +1,17 @@
 import { auth } from "@/lib/shared/auth";
+import { HOURS_IN_DAY, MINUTES_IN_HOUR, ONE, SECONDS_IN_MINUTE, ZERO } from "@/lib/shared/constants";
 import { prisma } from "@/lib/shared/prisma";
 import { TransactionType } from "@prisma/client";
-
-const HOURS_IN_DAY = 23;
-const MINUTES_IN_HOUR = 59;
-const SECONDS_IN_MINUTE = 59;
 
 export async function GET (request: Request) {
   try {
     const session = await auth();
 
-    if (!session || !session.user || !session.user.id) {
+    if (session === null || !session.user) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const userId = parseInt(session.user.id);
+    const { userId } = session.user;
     const url = new URL(request.url);
     const month = url.searchParams.get("month");
     const year = url.searchParams.get("year");
@@ -24,11 +21,11 @@ export async function GET (request: Request) {
 
     // Definir período padrão (mês atual)
     const currentDate = new Date();
-    const targetMonth = month ? parseInt(month) : currentDate.getMonth() + 1;
+    const targetMonth = month ? parseInt(month) : currentDate.getMonth() + ONE;
     const targetYear = year ? parseInt(year) : currentDate.getFullYear();
 
-    const startDate = new Date(targetYear, targetMonth - 1, 1);
-    const endDate = new Date(targetYear, targetMonth, 0, HOURS_IN_DAY, MINUTES_IN_HOUR, SECONDS_IN_MINUTE);
+    const startDate = new Date(targetYear, targetMonth - ONE, ONE);
+    const endDate = new Date(targetYear, targetMonth, ZERO, HOURS_IN_DAY, MINUTES_IN_HOUR, SECONDS_IN_MINUTE);
 
     // Buscar grupos do usuário
     const userGroups = await prisma.financialGroupMember.findMany({
@@ -92,10 +89,8 @@ export async function GET (request: Request) {
     });
 
     // Calcular totais
-    const income = transactions.filter((t) => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
-
-    const expenses = transactions.filter((t) => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
-
+    const income = transactions.filter((t) => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, ZERO);
+    const expenses = transactions.filter((t) => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, ZERO);
     const balance = income - expenses;
 
     // Agrupar por categoria
@@ -113,13 +108,13 @@ export async function GET (request: Request) {
       const categoryName = transaction.category?.name || "Sem categoria";
 
       acc[categoryName] ||= {
-        income: 0,
-        expenses: 0,
-        count: 0,
-        paidAmount: 0,
-        pendingAmount: 0,
-        paidCount: 0,
-        pendingCount: 0,
+        income: ZERO,
+        expenses: ZERO,
+        count: ZERO,
+        paidAmount: ZERO,
+        pendingAmount: ZERO,
+        paidCount: ZERO,
+        pendingCount: ZERO,
       };
 
       if (transaction.type === TransactionType.INCOME) {
@@ -127,15 +122,15 @@ export async function GET (request: Request) {
       } else {
         acc[categoryName].expenses += transaction.amount;
       }
-      acc[categoryName].count += 1;
+      acc[categoryName].count += ONE;
 
       // Agrupar por status de pagamento
       if (transaction.isPaid) {
         acc[categoryName].paidAmount += transaction.amount;
-        acc[categoryName].paidCount += 1;
+        acc[categoryName].paidCount += ONE;
       } else {
         acc[categoryName].pendingAmount += transaction.amount;
-        acc[categoryName].pendingCount += 1;
+        acc[categoryName].pendingCount += ONE;
       }
 
       return acc;
@@ -146,13 +141,13 @@ export async function GET (request: Request) {
       const accountName = transaction.bankAccount?.name || "Sem conta";
 
       acc[accountName] ||= {
-        income: 0,
-        expenses: 0,
-        count: 0,
-        paidAmount: 0,
-        pendingAmount: 0,
-        paidCount: 0,
-        pendingCount: 0,
+        income: ZERO,
+        expenses: ZERO,
+        count: ZERO,
+        paidAmount: ZERO,
+        pendingAmount: ZERO,
+        paidCount: ZERO,
+        pendingCount: ZERO,
       };
 
       if (transaction.type === TransactionType.INCOME) {
@@ -160,7 +155,7 @@ export async function GET (request: Request) {
       } else {
         acc[accountName].expenses += transaction.amount;
       }
-      acc[accountName].count += 1;
+      acc[accountName].count += ONE;
 
       return acc;
     }, {});
@@ -174,13 +169,13 @@ export async function GET (request: Request) {
       const cardName = `${transaction.creditCard.name} (****${transaction.creditCard.last4Digits})`;
 
       acc[cardName] ||= {
-        income: 0,
-        expenses: 0,
-        count: 0,
-        paidAmount: 0,
-        pendingAmount: 0,
-        paidCount: 0,
-        pendingCount: 0,
+        income: ZERO,
+        expenses: ZERO,
+        count: ZERO,
+        paidAmount: ZERO,
+        pendingAmount: ZERO,
+        paidCount: ZERO,
+        pendingCount: ZERO,
       };
 
       if (transaction.type === TransactionType.INCOME) {
@@ -188,32 +183,32 @@ export async function GET (request: Request) {
       } else {
         acc[cardName].expenses += transaction.amount;
       }
-      acc[cardName].count += 1;
+      acc[cardName].count += ONE;
 
       return acc;
     }, {});
 
     // Calcular totais por status de pagamento
     const paymentStatus = {
-      totalPaid: 0,
-      totalPending: 0,
-      paidTransactions: 0,
-      pendingTransactions: 0,
-      overdueTransactions: 0,
-      overdueAmount: 0,
+      totalPaid: ZERO,
+      totalPending: ZERO,
+      paidTransactions: ZERO,
+      pendingTransactions: ZERO,
+      overdueTransactions: ZERO,
+      overdueAmount: ZERO,
     };
 
     for (const transaction of transactions) {
       if (transaction.isPaid) {
         paymentStatus.totalPaid += transaction.amount;
-        paymentStatus.paidTransactions += 1;
+        paymentStatus.paidTransactions += ONE;
       } else {
         paymentStatus.totalPending += transaction.amount;
-        paymentStatus.pendingTransactions += 1;
+        paymentStatus.pendingTransactions += ONE;
 
         // Verificar se está em atraso
         if (transaction.dueDate && transaction.dueDate < currentDate) {
-          paymentStatus.overdueTransactions += 1;
+          paymentStatus.overdueTransactions += ONE;
           paymentStatus.overdueAmount += transaction.amount;
         }
       }

@@ -1,17 +1,20 @@
 import { auth } from "@/lib/shared/auth";
+import {
+  DECEMBER_MONTH,
+  HOURS_IN_DAY,
+  LAST_DAY_OF_MONTH,
+  MINUTES_IN_HOUR,
+  MONTHS_IN_YEAR,
+  ONE,
+  PAD_CHAR,
+  PAD_LENGTH,
+  PERCENTAGE_MULTIPLIER,
+  SECONDS_IN_MINUTE,
+  TOP_CATEGORIES_LIMIT,
+  ZERO,
+} from "@/lib/shared/constants";
 import { prisma } from "@/lib/shared/prisma";
 import { TransactionType } from "@prisma/client";
-
-const DECEMBER_MONTH = 11;
-const LAST_DAY_OF_MONTH = 31;
-const HOURS_IN_DAY = 23;
-const MINUTES_IN_HOUR = 59;
-const SECONDS_IN_MINUTE = 59;
-const PERCENTAGE_MULTIPLIER = 100;
-const MONTHS_IN_YEAR = 12;
-const PAD_LENGTH = 2;
-const PAD_CHAR = "0";
-const TOP_CATEGORIES_LIMIT = 5;
 
 interface TransactionWithRelations {
   id: number;
@@ -33,13 +36,13 @@ type CategoryBreakdown = Record<string, {
 
 function calculatePaymentAnalysis (transactions: TransactionWithRelations[], currentDate: Date) {
   const paymentAnalysis = {
-    totalPaid: 0,
-    totalPending: 0,
-    paidCount: 0,
-    pendingCount: 0,
-    overdueAmount: 0,
-    overdueCount: 0,
-    paymentRate: 0,
+    totalPaid: ZERO,
+    totalPending: ZERO,
+    paidCount: ZERO,
+    pendingCount: ZERO,
+    overdueAmount: ZERO,
+    overdueCount: ZERO,
+    paymentRate: ZERO,
   };
 
   for (const transaction of transactions) {
@@ -57,9 +60,9 @@ function calculatePaymentAnalysis (transactions: TransactionWithRelations[], cur
     }
   }
 
-  paymentAnalysis.paymentRate = transactions.length > 0 ?
+  paymentAnalysis.paymentRate = transactions.length > ZERO ?
       (paymentAnalysis.paidCount / transactions.length) * PERCENTAGE_MULTIPLIER :
-    0;
+    ZERO;
 
   return paymentAnalysis;
 }
@@ -68,14 +71,14 @@ function calculateCategoryBreakdown (transactions: TransactionWithRelations[], i
   const byCategory = transactions.reduce((acc: CategoryBreakdown, transaction) => {
     const categoryName = transaction.category?.name || "Sem categoria";
 
-    acc[categoryName] ||= { income: 0, expenses: 0, count: 0, percentage: 0 };
+    acc[categoryName] ||= { income: ZERO, expenses: ZERO, count: ZERO, percentage: ZERO };
 
     if (transaction.type === TransactionType.INCOME) {
       acc[categoryName].income += transaction.amount;
     } else {
       acc[categoryName].expenses += transaction.amount;
     }
-    acc[categoryName].count += 1;
+    acc[categoryName].count += ONE;
 
     return acc;
   }, {});
@@ -85,7 +88,7 @@ function calculateCategoryBreakdown (transactions: TransactionWithRelations[], i
     const totalForCategory = byCategory[category].income + byCategory[category].expenses;
     const totalOverall = income + expenses;
 
-    byCategory[category].percentage = totalOverall > 0 ? (totalForCategory / totalOverall) * PERCENTAGE_MULTIPLIER : 0;
+    byCategory[category].percentage = totalOverall > ZERO ? (totalForCategory / totalOverall) * PERCENTAGE_MULTIPLIER : ZERO;
   }
 
   return byCategory;
@@ -95,11 +98,11 @@ export async function GET (request: Request) {
   try {
     const session = await auth();
 
-    if (!session || !session.user || !session.user.id) {
+    if (session === null || !session.user) {
       return Response.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    const userId = parseInt(session.user.id);
+    const { userId } = session.user;
     const url = new URL(request.url);
     const year = url.searchParams.get("year");
     const categoryId = url.searchParams.get("categoryId");
@@ -110,7 +113,7 @@ export async function GET (request: Request) {
     const currentDate = new Date();
     const targetYear = year ? parseInt(year) : currentDate.getFullYear();
 
-    const startDate = new Date(targetYear, 0, 1);
+    const startDate = new Date(targetYear, ZERO, ONE);
     const endDate = new Date(targetYear, DECEMBER_MONTH, LAST_DAY_OF_MONTH, HOURS_IN_DAY, MINUTES_IN_HOUR, SECONDS_IN_MINUTE);
 
     // Buscar grupos do usuário
@@ -175,8 +178,8 @@ export async function GET (request: Request) {
     });
 
     // Calcular totais anuais com status de pagamento
-    const income = transactions.filter((t) => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
-    const expenses = transactions.filter((t) => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
+    const income = transactions.filter((t) => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, ZERO);
+    const expenses = transactions.filter((t) => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, ZERO);
     const balance = income - expenses;
 
     // Calcular estatísticas de pagamento
@@ -194,19 +197,19 @@ export async function GET (request: Request) {
       }
 
       const cardName = `${transaction.creditCard.name} (****${transaction.creditCard.last4Digits})`;
-      const month = transaction.transactionDate.getMonth() + 1;
+      const month = transaction.transactionDate.getMonth() + ONE;
       const monthKey = `${targetYear}-${month.toString().padStart(PAD_LENGTH, PAD_CHAR)}`;
 
       acc[cardName] ||= {
-        totalSpent: 0,
-        transactionCount: 0,
-        averageTransaction: 0,
+        totalSpent: ZERO,
+        transactionCount: ZERO,
+        averageTransaction: ZERO,
         monthlySpend: {},
       };
 
       acc[cardName].totalSpent += transaction.amount;
-      acc[cardName].transactionCount += 1;
-      acc[cardName].monthlySpend[monthKey] = (acc[cardName].monthlySpend[monthKey] || 0) + transaction.amount;
+      acc[cardName].transactionCount += ONE;
+      acc[cardName].monthlySpend[monthKey] = (acc[cardName].monthlySpend[monthKey] || ZERO) + transaction.amount;
       acc[cardName].averageTransaction = acc[cardName].totalSpent / acc[cardName].transactionCount;
 
       return acc;
@@ -221,10 +224,10 @@ export async function GET (request: Request) {
     }>;
 
     const monthlyData = transactions.reduce((acc: MonthlyData, transaction) => {
-      const month = transaction.transactionDate.getMonth() + 1;
+      const month = transaction.transactionDate.getMonth() + ONE;
       const monthKey = `${targetYear}-${month.toString().padStart(PAD_LENGTH, PAD_CHAR)}`;
 
-      acc[monthKey] ||= { income: 0, expenses: 0, balance: 0, count: 0 };
+      acc[monthKey] ||= { income: ZERO, expenses: ZERO, balance: ZERO, count: ZERO };
 
       if (transaction.type === TransactionType.INCOME) {
         acc[monthKey].income += transaction.amount;
@@ -232,7 +235,7 @@ export async function GET (request: Request) {
         acc[monthKey].expenses += transaction.amount;
       }
       acc[monthKey].balance = acc[monthKey].income - acc[monthKey].expenses;
-      acc[monthKey].count += 1;
+      acc[monthKey].count += ONE;
 
       return acc;
     }, {});
@@ -242,32 +245,32 @@ export async function GET (request: Request) {
 
     // Top categorias por gastos
     const topExpenseCategories = Object.entries(byCategory).
-      filter(([ , data ]) => (data as CategoryBreakdown[string]).expenses > 0).
+      filter(([ , data ]) => (data as CategoryBreakdown[string]).expenses > ZERO).
       sort(([ , a ], [ , b ]) => (b as CategoryBreakdown[string]).expenses - (a as CategoryBreakdown[string]).expenses).
-      slice(0, TOP_CATEGORIES_LIMIT).
+      slice(ZERO, TOP_CATEGORIES_LIMIT).
       map(([ name, data ]) => ({ name, ...(data as CategoryBreakdown[string]) }));
 
     // Metas de economia (comparação com ano anterior)
-    const previousYear = targetYear - 1;
+    const previousYear = targetYear - ONE;
     const previousYearTransactions = await prisma.transaction.findMany({
       where: {
         groupId: { "in": groupIds },
         transactionDate: {
-          gte: new Date(previousYear, 0, 1),
+          gte: new Date(previousYear, ZERO, ONE),
           lte: new Date(previousYear, DECEMBER_MONTH, LAST_DAY_OF_MONTH),
         },
       },
     });
 
-    const previousYearIncome = previousYearTransactions.filter((t) => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0);
-    const previousYearExpenses = previousYearTransactions.filter((t) => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0);
+    const previousYearIncome = previousYearTransactions.filter((t) => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, ZERO);
+    const previousYearExpenses = previousYearTransactions.filter((t) => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, ZERO);
     const previousYearBalance = previousYearIncome - previousYearExpenses;
 
     const comparison = {
-      incomeGrowth: previousYearIncome > 0 ? ((income - previousYearIncome) / previousYearIncome) * PERCENTAGE_MULTIPLIER : 0,
-      expenseGrowth: previousYearExpenses > 0 ? ((expenses - previousYearExpenses) / previousYearExpenses) * PERCENTAGE_MULTIPLIER : 0,
+      incomeGrowth: previousYearIncome > ZERO ? ((income - previousYearIncome) / previousYearIncome) * PERCENTAGE_MULTIPLIER : ZERO,
+      expenseGrowth: previousYearExpenses > ZERO ? ((expenses - previousYearExpenses) / previousYearExpenses) * PERCENTAGE_MULTIPLIER : ZERO,
       balanceImprovement: balance - previousYearBalance,
-      percentageImprovement: previousYearBalance === 0 ? 0 : ((balance - previousYearBalance) / Math.abs(previousYearBalance)) * PERCENTAGE_MULTIPLIER,
+      percentageImprovement: previousYearBalance === ZERO ? ZERO : ((balance - previousYearBalance) / Math.abs(previousYearBalance)) * PERCENTAGE_MULTIPLIER,
     };
 
     return Response.json({
@@ -301,9 +304,9 @@ export async function GET (request: Request) {
       creditCardAnalysis: creditCardUsage,
       comparison,
       insights: {
-        savingsRate: income > 0 ? ((income - expenses) / income) * PERCENTAGE_MULTIPLIER : 0,
-        expenseRatio: income > 0 ? (expenses / income) * PERCENTAGE_MULTIPLIER : 0,
-        mostExpensiveMonth: Object.entries(monthlyData).reduce((max, [ month, data ]) => data.expenses > (max.expenses || 0) ? { month, expenses: data.expenses } : max, {} as { month?: string; expenses?: number }),
+        savingsRate: income > ZERO ? ((income - expenses) / income) * PERCENTAGE_MULTIPLIER : ZERO,
+        expenseRatio: income > ZERO ? (expenses / income) * PERCENTAGE_MULTIPLIER : ZERO,
+        mostExpensiveMonth: Object.entries(monthlyData).reduce((max, [ month, data ]) => data.expenses > (max.expenses || ZERO) ? { month, expenses: data.expenses } : max, {} as { month?: string; expenses?: number }),
       },
     }, { status: 200 });
   } catch (error) {

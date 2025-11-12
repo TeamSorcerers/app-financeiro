@@ -1,7 +1,8 @@
-// @ts-expect-error The file exists, but TS is not detecting it
-import "@/assets/css/globals.css";
+import AuthenticatedLayout from "@/components/layout/AuthenticatedLayout";
 import type { Metadata } from "next";
+import { SessionProvider } from "next-auth/react";
 import { Geist, Geist_Mono, Raleway } from "next/font/google";
+import "./globals.css";
 
 const raleway = Raleway({
   subsets: [ "latin" ],
@@ -27,16 +28,13 @@ export default function RootLayout ({ children }: Readonly<{children: React.Reac
   return (
     <html lang="pt">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${raleway.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${raleway.variable} antialiased bg-[#F0F0F3]`}
       >
-        <main
-          className="
-            w-full
-            h-full
-          "
-        >
-          { children }
-        </main>
+        <SessionProvider>
+          <AuthenticatedLayout>
+            {children}
+          </AuthenticatedLayout>
+        </SessionProvider>
       </body>
     </html>
   );

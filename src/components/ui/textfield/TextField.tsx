@@ -15,9 +15,26 @@ export interface TextFieldProps {
   placeholder?: string;
   classNames?: TextFieldClassNames;
   error?: string;
+
+  ref?: React.Ref<HTMLInputElement>;
+
+  value?: string;
+  onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: (event: React.FocusEvent<HTMLInputElement>) => void;
 }
 
-export default function TextField ({ id, type, label, placeholder, classNames, error }: TextFieldProps) {
+export default function TextField ({
+  id,
+  type,
+  label,
+  placeholder,
+  classNames,
+  error,
+  ref,
+  value,
+  onChange,
+  onBlur,
+}: TextFieldProps) {
   return (
     <div
       className={`flex flex-col mb-4 ${classNames?.container}`}
@@ -27,6 +44,7 @@ export default function TextField ({ id, type, label, placeholder, classNames, e
         id={id}
         name={id}
         type={type}
+        aria-label={label}
         placeholder={placeholder}
         className={`
           p-4
@@ -42,6 +60,10 @@ export default function TextField ({ id, type, label, placeholder, classNames, e
           transition-shadow
           duration-200
         `}
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        ref={ref}
       />
       {
         error &&

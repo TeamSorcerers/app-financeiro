@@ -35,6 +35,11 @@ declare module "next-auth" {
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   basePath: gateways.AUTH(),
+  pages: {
+    signIn: "/login",
+    error: "/login",
+  },
+  session: { strategy: "jwt" },
   providers: [
     Credentials({
       credentials: {
@@ -52,19 +57,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const { success, data } = await AuthLoginSchema.safeParseAsync(credentials);
 
         if (!success) {
-          throw new InvalidCredentialsError("Dados de autenticação inválidos");
+          throw new InvalidCredentialsError("Credenciais inválidas");
         }
 
         const user = await prisma.user.findUnique({ where: { email: data.email } });
 
         if (!user || !await compare(data.password, user.password)) {
-          throw new InvalidCredentialsError("Nome de usuário ou senha inválidos");
+          throw new InvalidCredentialsError("Credenciais inválidas");
         }
 
         return {
           id: user.id.toString(),
           userId: user.id,
           name: user.name,
+          email: user.email,
         };
       },
     }),

@@ -25,7 +25,7 @@ export async function GET (req: NextRequest, { params }: { params: Promise<{ id:
         orderBy: { transactionDate: "desc" },
         include: {
           createdBy: { select: { id: true, name: true, email: true } },
-          category: { select: { name: true } },
+          category: { select: { id: true, name: true } },
         },
       },
     },
@@ -61,9 +61,11 @@ export async function GET (req: NextRequest, { params }: { params: Promise<{ id:
     type: t.type,
     description: t.description,
     transactionDate: t.transactionDate,
+    isPaid: t.isPaid,
+    status: t.status,
     createdAt: t.createdAt,
     createdBy: t.createdBy ? { id: t.createdBy.id, name: t.createdBy.name } : null,
-    category: t.category ? { name: t.category.name } : null,
+    category: t.category ? { id: t.category.id, name: t.category.name } : null,
   }));
 
   return NextResponse.json({
