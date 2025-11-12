@@ -16,6 +16,7 @@ export async function GET () {
       where: { createdById: session.user.userId },
       include: {
         group: true,
+        category: true,
         createdBy: {
           select: {
             id: true,
@@ -58,7 +59,7 @@ export async function POST (request: NextRequest) {
       }, { status: 400 });
     }
 
-    const { groupId } = data;
+    const { groupId, creditCardId, dueDate } = data;
 
     const group = await prisma.financialGroup.findFirst({
       where: {
@@ -80,15 +81,57 @@ export async function POST (request: NextRequest) {
       }
     }
 
+    // Calcular data de vencimento automaticamente se for cartão de crédito
+    let calculatedDueDate = dueDate ? new Date(dueDate) : null;
+
+    if (creditCardId && !calculatedDueDate) {
+      const creditCard = await prisma.creditCard.findUnique({
+        where: { id: creditCardId },
+        select: { dueDay: true, closingDay: true },
+      });
+
+      if (creditCard && creditCard.dueDay) {
+        const transactionDate = new Date(data.transactionDate);
+        const currentMonth = transactionDate.getMonth();
+        const currentYear = transactionDate.getFullYear();
+
+        // Se a transação foi depois do fechamento, vencimento será no próximo mês
+        const isAfterClosing = creditCard.closingDay ? transactionDate.getDate() > creditCard.closingDay : false;
+        const dueMonth = isAfterClosing ? currentMonth + 1 : currentMonth;
+
+        calculatedDueDate = new Date(currentYear, dueMonth, creditCard.dueDay);
+      }
+    }
+
+    // Determinar status inicial baseado no tipo e método de pagamento
+    let initialStatus = data.status || "PENDING";
+    let initialIsPaid = data.isPaid || false;
+
+    // Se for receita e não for cartão de crédito, marcar como pago automaticamente
+    if (data.type === "INCOME" && !creditCardId) {
+      initialStatus = "PAID";
+      initialIsPaid = true;
+    }
+
     const transaction = await prisma.transaction.create({
       data: {
         amount: data.amount,
         type: data.type,
+        status: initialStatus,
         description: data.description,
         transactionDate: new Date(data.transactionDate),
+        dueDate: calculatedDueDate,
+        paidAt: initialIsPaid ? new Date() : null,
+        isPaid: initialIsPaid,
         categoryId: data.categoryId,
         createdById: session.user.userId,
         groupId: group.id,
+        creditCardId: data.creditCardId,
+        bankAccountId: data.bankAccountId,
+        paymentMethodId: data.paymentMethodId,
+        installmentNumber: data.installmentNumber,
+        totalInstallments: data.totalInstallments,
+        recurringTransactionId: data.recurringTransactionId,
       },
       include: {
         category: true,
@@ -100,6 +143,9 @@ export async function POST (request: NextRequest) {
             email: true,
           },
         },
+        paymentMethod: true,
+        bankAccount: true,
+        creditCard: true,
       },
     });
 
