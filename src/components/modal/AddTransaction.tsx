@@ -124,6 +124,16 @@ export default function AddTransaction ({ groupId, isOpen, onClose, onSuccess }:
 
   const selectedType = watch("type");
   const selectedPaymentMethodId = watch("paymentMethodId");
+  const selectedStatus = watch("status");
+
+  // Sincronizar isPaid com status
+  useEffect(() => {
+    if (selectedStatus === "PAID") {
+      setValue("isPaid", true);
+    } else if ([ "PENDING", "OVERDUE", "CANCELLED" ].includes(selectedStatus || "")) {
+      setValue("isPaid", false);
+    }
+  }, [ selectedStatus, setValue ]);
 
   // Buscar o método de pagamento selecionado para determinar se precisa de campos adicionais
   const selectedPaymentMethod = paymentMethods.find((pm) => pm.id === Number(selectedPaymentMethodId));
