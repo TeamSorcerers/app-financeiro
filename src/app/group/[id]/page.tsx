@@ -659,9 +659,17 @@ export default function GroupDetailPage ({ params }: { params: Promise<{ id: str
             <CreditCard size={20} className="text-[#4A90E2]" />
             <h3 className="font-semibold text-[#4a4a4a]">Transações Recentes</h3>
           </div>
-          <button onClick={loadGroupData} className="text-sm text-[#4A90E2] hover:text-[#2E6FB7] transition">
-            Atualizar
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => router.push(`/group/${groupId}/transactions`)} 
+              className="text-sm text-[#4A90E2] hover:text-[#2E6FB7] transition"
+            >
+              Ver todas
+            </button>
+            <button onClick={loadGroupData} className="text-sm text-[#4A90E2] hover:text-[#2E6FB7] transition">
+              Atualizar
+            </button>
+          </div>
         </div>
 
         <div className="space-y-2 max-h-96 overflow-y-auto">

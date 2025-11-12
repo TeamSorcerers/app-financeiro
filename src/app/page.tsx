@@ -602,13 +602,6 @@ export default function HomePage () {
                 <div className="text-lg font-bold text-[#c92a2a]">{formatCurrency(metrics.overdueExpenses)}</div>
               </div>
             )}
-
-            <button
-              onClick={() => router.push("/transactions")}
-              className="w-full mt-3 px-4 py-2 rounded-xl bg-[#F0F0F3] text-[#4A90E2] text-sm font-medium shadow-[-3px_-3px_6px_rgba(255,255,255,0.9),3px_3px_6px_rgba(174,174,192,0.2)] hover:shadow-[inset_2px_2px_4px_rgba(174,174,192,0.2)] transition-all"
-            >
-              Ver Todas as Transações
-            </button>
           </div>
         </div>
       </div>
@@ -620,9 +613,18 @@ export default function HomePage () {
             <CreditCard size={20} className="text-[#4A90E2]" />
             <h3 className="font-semibold text-[#4a4a4a]">Transações Recentes</h3>
           </div>
-          <button onClick={refreshData} className="text-sm text-[#4A90E2] hover:text-[#2E6FB7] transition">
-            Atualizar
-          </button>
+
+          <div className="flex gap-2">
+            <button 
+              onClick={() => router.push("/transactions")} 
+              className="text-sm text-[#4A90E2] hover:text-[#2E6FB7] transition"
+            >
+              Ver todas
+            </button>
+            <button onClick={refreshData} className="text-sm text-[#4A90E2] hover:text-[#2E6FB7] transition">
+              Atualizar
+            </button>
+          </div>
         </div>
 
         <div className="space-y-2 max-h-96 overflow-y-auto">

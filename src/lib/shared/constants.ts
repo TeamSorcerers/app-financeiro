@@ -39,6 +39,7 @@ export const SORT_ORDER_FIRST = -1;
 export const SORT_ORDER_LAST = 1;
 export const ZERO = 0;
 export const ONE = 1;
+export const MINUS_ONE = -1;
 
 // Card Constants
 export const CREDIT_CARD_LAST_DIGITS = 4;
