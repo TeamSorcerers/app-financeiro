@@ -18,31 +18,29 @@ export const TransactionSchema = z.object({
   isPaid: z.boolean().default(false),
 
   // IDs relacionados
-  categoryId: z.number().int().
+  categoryId: z.int().
     positive().
     optional(),
-  groupId: z.number({ error: "ID do grupo é obrigatório" }).int().
+  groupId: z.int({ error: "ID do grupo é obrigatório" }).
     positive(),
-  paymentMethodId: z.number().int().
+  paymentMethodId: z.int().
     positive().
     optional(),
-  bankAccountId: z.number().int().
+  bankAccountId: z.int().
     positive().
     optional(),
-  creditCardId: z.number().int().
+  creditCardId: z.int().
     positive().
     optional(),
-  recurringTransactionId: z.number().int().
+  recurringTransactionId: z.int().
     positive().
     optional(),
 
   // Parcelamento
-  installmentNumber: z.number().
-    int("Número da parcela deve ser inteiro").
+  installmentNumber: z.int("Número da parcela deve ser inteiro").
     min(ONE, "Número da parcela deve ser maior que 0").
     optional(),
-  totalInstallments: z.number().
-    int("Total de parcelas deve ser inteiro").
+  totalInstallments: z.int("Total de parcelas deve ser inteiro").
     min(ONE, "Total de parcelas deve ser maior que 0").
     optional(),
 }).

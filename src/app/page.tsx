@@ -3,7 +3,7 @@
 import AddTransaction from "@/components/modal/AddTransaction";
 import TransactionDetailModal from "@/components/modal/TransactionDetailModal";
 import { HOURS_IN_DAY, HTTP_STATUS, MILLISECONDS, MINUTES_IN_HOUR, ONE, SECONDS_IN_MINUTE, ZERO } from "@/lib/shared/constants";
-import { ArrowDown, ArrowUp, Calendar, CreditCard, DollarSign, Folder, PieChart, Plus, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { ArrowDown, ArrowUp, Calendar, CreditCard, DollarSign, Edit2, Folder, PieChart, Plus, Trash2, TrendingDown, TrendingUp, Wallet, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -36,6 +36,11 @@ interface CategorySummary {
   percentage: number;
 }
 
+interface Category {
+  id: number;
+  name: string;
+}
+
 const PERCENTAGE_MULTIPLIER = 100;
 const MONTHS = [ "Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez" ];
 
@@ -55,11 +60,19 @@ export default function HomePage () {
 
   const [ group, setGroup ] = useState<PersonalGroupData | null>(null);
   const [ transactions, setTransactions ] = useState<TransactionItem[]>([]);
+  const [ categories, setCategories ] = useState<Category[]>([]);
   const [ loading, setLoading ] = useState(true);
   const [ error, setError ] = useState<string | null>(null);
   const [ modalOpen, setModalOpen ] = useState(false);
   const [ showTransactionDetail, setShowTransactionDetail ] = useState(false);
   const [ selectedTransaction, setSelectedTransaction ] = useState<TransactionItem | null>(null);
+  const [ showCategoryModal, setShowCategoryModal ] = useState(false);
+  const [ showEditCategoryModal, setShowEditCategoryModal ] = useState(false);
+  const [ showDeleteCategoryModal, setShowDeleteCategoryModal ] = useState(false);
+  const [ categoryName, setCategoryName ] = useState("");
+  const [ editingCategory, setEditingCategory ] = useState<Category | null>(null);
+  const [ deletingCategory, setDeletingCategory ] = useState<Category | null>(null);
+  const [ submitting, setSubmitting ] = useState(false);
 
   function openTransactionDetail (transaction: TransactionItem) {
     setSelectedTransaction(transaction);
@@ -247,6 +260,9 @@ export default function HomePage () {
 
             setTransactions(txJson.transactions ?? []);
           }
+
+          // Buscar categorias do grupo pessoal
+          loadCategories(json.data.id);
         }
       } catch (e: unknown) {
         if (!mounted) {
@@ -269,6 +285,19 @@ export default function HomePage () {
     };
   }, [ sessionStatus, router ]);
 
+  async function loadCategories(groupId: number) {
+    try {
+      const res = await fetch(`/api/categories?groupId=${groupId}`, { credentials: "include" });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data.categories || []);
+      }
+    } catch (err) {
+      console.error("Erro ao carregar categorias:", err);
+    }
+  }
+
   const refreshData = async () => {
     if (!group?.id) {
       return;
@@ -290,6 +319,109 @@ export default function HomePage () {
     }
   };
 
+  async function handleCreateCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!categoryName.trim() || !group?.id) {
+      setError("Nome da categoria é obrigatório");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: categoryName.trim(), groupId: group.id }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Erro ao criar categoria");
+        return;
+      }
+
+      setCategoryName("");
+      setShowCategoryModal(false);
+      loadCategories(group.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao criar categoria");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleEditCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingCategory || !categoryName.trim()) {
+      setError("Nome da categoria é obrigatório");
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/categories/${editingCategory.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: categoryName.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Erro ao editar categoria");
+        return;
+      }
+
+      setCategoryName("");
+      setEditingCategory(null);
+      setShowEditCategoryModal(false);
+      if (group?.id) loadCategories(group.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao editar categoria");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDeleteCategory() {
+    if (!deletingCategory) return;
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/categories/${deletingCategory.id}`, { method: "DELETE" });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Erro ao deletar categoria");
+        return;
+      }
+
+      setDeletingCategory(null);
+      setShowDeleteCategoryModal(false);
+      if (group?.id) loadCategories(group.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao deletar categoria");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function openEditCategoryModal(category: Category) {
+    setEditingCategory(category);
+    setCategoryName(category.name);
+    setShowEditCategoryModal(true);
+  }
+
+  function openDeleteCategoryModal(category: Category) {
+    setDeletingCategory(category);
+    setShowDeleteCategoryModal(true);
+  }
+
   if (sessionStatus === "loading" || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F0F0F3]">
@@ -310,7 +442,7 @@ export default function HomePage () {
 
           <div className="flex gap-3">
             <button
-              onClick={() => router.push("/categories")}
+              onClick={() => setShowCategoryModal(true)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#F0F0F3] text-[#6a6a6a] font-semibold shadow-[-4px_-4px_8px_rgba(255,255,255,0.8),4px_4px_8px_rgba(174,174,192,0.25)] hover:shadow-[-2px_-2px_4px_rgba(255,255,255,0.9),2px_2px_4px_rgba(174,174,192,0.3)] active:shadow-[inset_2px_2px_4px_rgba(174,174,192,0.2)] transition-all text-sm"
             >
               <Folder size={18} />
@@ -558,6 +690,121 @@ export default function HomePage () {
           refreshData();
         }}
       />
+
+      {/* Modal Gerenciar Categorias */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => setShowCategoryModal(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md bg-[#F0F0F3] rounded-3xl shadow-[-6px_-6px_12px_rgba(255,255,255,0.9),6px_6px_12px_rgba(174,174,192,0.2)] p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-[#4A90E2]">Gerenciar Categorias</h3>
+              <button
+                onClick={() => setShowCategoryModal(false)}
+                className="w-8 h-8 rounded-full bg-[#F0F0F3] shadow-[-3px_-3px_6px_rgba(255,255,255,0.9),3px_3px_6px_rgba(174,174,192,0.2)] hover:shadow-[inset_2px_2px_4px_rgba(174,174,192,0.2)] flex items-center justify-center transition-all"
+              >
+                <X size={16} className="text-[#6a6a6a]" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} className="mb-4">
+              <label className="block text-sm text-[#4a4a4a] font-semibold mb-2">Nova Categoria</label>
+              <div className="flex gap-2">
+                <input
+                  value={categoryName}
+                  onChange={(e) => setCategoryName(e.target.value)}
+                  required
+                  placeholder="Nome da categoria"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-[#F0F0F3] text-[#4a4a4a] placeholder:text-[#a0a0a0] shadow-[inset_3px_3px_6px_rgba(174,174,192,0.15),inset_-3px_-3px_6px_rgba(255,255,255,0.7)] focus:shadow-[inset_4px_4px_8px_rgba(174,174,192,0.2)] focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2.5 rounded-xl bg-[#4A90E2] text-white font-bold shadow-[-4px_-4px_8px_rgba(255,255,255,0.6),4px_4px_8px_rgba(174,174,192,0.4)] hover:shadow-[-2px_-2px_4px_rgba(255,255,255,0.7),2px_2px_4px_rgba(174,174,192,0.5)] disabled:opacity-60 transition-all"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
+            </form>
+
+            <div className="space-y-2">
+              {categories.length === ZERO ? (
+                <div className="text-center text-[#6a6a6a] py-4 text-sm">Nenhuma categoria cadastrada</div>
+              ) : (
+                categories.map((cat) => (
+                  <div key={cat.id} className="flex items-center justify-between p-3 bg-[#F0F0F3] rounded-xl shadow-[inset_2px_2px_4px_rgba(174,174,192,0.12)]">
+                    <span className="text-sm font-medium text-[#4a4a4a]">{cat.name}</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => openEditCategoryModal(cat)}
+                        className="w-8 h-8 rounded-lg bg-[#F0F0F3] shadow-[-3px_-3px_6px_rgba(255,255,255,0.9),3px_3px_6px_rgba(174,174,192,0.2)] hover:shadow-[inset_2px_2px_4px_rgba(174,174,192,0.2)] flex items-center justify-center transition-all"
+                      >
+                        <Edit2 size={14} className="text-[#4A90E2]" />
+                      </button>
+                      <button
+                        onClick={() => openDeleteCategoryModal(cat)}
+                        className="w-8 h-8 rounded-lg bg-[#F0F0F3] shadow-[-3px_-3px_6px_rgba(255,255,255,0.9),3px_3px_6px_rgba(174,174,192,0.2)] hover:shadow-[inset_2px_2px_4px_rgba(174,174,192,0.2)] flex items-center justify-center transition-all"
+                      >
+                        <Trash2 size={14} className="text-[#c92a2a]" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Categoria */}
+      {showEditCategoryModal && editingCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => setShowEditCategoryModal(false)}>
+          <form onClick={(e) => e.stopPropagation()} onSubmit={handleEditCategory} className="w-full max-w-md bg-[#F0F0F3] rounded-3xl shadow-[-6px_-6px_12px_rgba(255,255,255,0.9),6px_6px_12px_rgba(174,174,192,0.2)] p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-[#4A90E2]">Editar Categoria</h3>
+              <button type="button" onClick={() => setShowEditCategoryModal(false)} className="w-8 h-8 rounded-full bg-[#F0F0F3] shadow-[-3px_-3px_6px_rgba(255,255,255,0.9),3px_3px_6px_rgba(174,174,192,0.2)] hover:shadow-[inset_2px_2px_4px_rgba(174,174,192,0.2)] flex items-center justify-center transition-all">
+                <X size={16} className="text-[#6a6a6a]" />
+              </button>
+            </div>
+
+            <label className="block text-sm text-[#4a4a4a] font-semibold mb-2">Nome da Categoria</label>
+            <input
+              value={categoryName}
+              onChange={(e) => setCategoryName(e.target.value)}
+              required
+              className="w-full px-4 py-2.5 mb-4 rounded-xl bg-[#F0F0F3] text-[#4a4a4a] shadow-[inset_3px_3px_6px_rgba(174,174,192,0.15),inset_-3px_-3px_6px_rgba(255,255,255,0.7)] focus:shadow-[inset_4px_4px_8px_rgba(174,174,192,0.2)] focus:outline-none"
+            />
+
+            <div className="flex gap-3">
+              <button type="button" onClick={() => setShowEditCategoryModal(false)} className="flex-1 px-4 py-2.5 rounded-xl bg-[#F0F0F3] text-[#6a6a6a] font-semibold shadow-[-4px_-4px_8px_rgba(255,255,255,0.8),4px_4px_8px_rgba(174,174,192,0.25)] hover:shadow-[-2px_-2px_4px_rgba(255,255,255,0.9),2px_2px_4px_rgba(174,174,192,0.3)] transition-all">
+                Cancelar
+              </button>
+              <button type="submit" disabled={submitting} className="flex-1 px-4 py-2.5 rounded-xl bg-[#4A90E2] text-white font-bold shadow-[-4px_-4px_8px_rgba(255,255,255,0.6),4px_4px_8px_rgba(174,174,192,0.4)] hover:shadow-[-2px_-2px_4px_rgba(255,255,255,0.7),2px_2px_4px_rgba(174,174,192,0.5)] disabled:opacity-60 transition-all">
+                {submitting ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal Deletar Categoria */}
+      {showDeleteCategoryModal && deletingCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={() => setShowDeleteCategoryModal(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md bg-[#F0F0F3] rounded-3xl shadow-[-6px_-6px_12px_rgba(255,255,255,0.9),6px_6px_12px_rgba(174,174,192,0.2)] p-6">
+            <h3 className="text-xl font-bold text-[#c92a2a] mb-4">Deletar Categoria</h3>
+            <p className="text-[#4a4a4a] mb-6">
+              Tem certeza que deseja deletar a categoria <strong>{deletingCategory.name}</strong>? Esta ação não pode ser desfeita.
+            </p>
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteCategoryModal(false)} className="flex-1 px-4 py-2.5 rounded-xl bg-[#F0F0F3] text-[#6a6a6a] font-semibold shadow-[-4px_-4px_8px_rgba(255,255,255,0.8),4px_4px_8px_rgba(174,174,192,0.25)] hover:shadow-[-2px_-2px_4px_rgba(255,255,255,0.9),2px_2px_4px_rgba(174,174,192,0.3)] transition-all">
+                Cancelar
+              </button>
+              <button onClick={handleDeleteCategory} disabled={submitting} className="flex-1 px-4 py-2.5 rounded-xl bg-[#c92a2a] text-white font-bold shadow-[-4px_-4px_8px_rgba(255,255,255,0.6),4px_4px_8px_rgba(174,174,192,0.4)] hover:shadow-[-2px_-2px_4px_rgba(255,255,255,0.7),2px_2px_4px_rgba(174,174,192,0.5)] disabled:opacity-60 transition-all">
+                {submitting ? "Deletando..." : "Deletar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
