@@ -90,28 +90,6 @@ export const TransactionSchema = z.object({
   }, {
     message: "Número da parcela não pode ser maior que o total de parcelas",
     path: [ "installmentNumber" ],
-  }).
-  refine((data) => {
-    // Se usar cartão de crédito, deve ter dueDate
-    if (data.creditCardId && !data.dueDate) {
-      return false;
-    }
-
-    return true;
-  }, {
-    message: "Transações com cartão de crédito devem ter data de vencimento",
-    path: [ "dueDate" ],
-  }).
-  refine((data) => {
-    // Cartão de crédito e conta bancária não podem ser usados juntos (lógica de negócio)
-    if (data.creditCardId && data.bankAccountId) {
-      return false;
-    }
-
-    return true;
-  }, {
-    message: "Não é possível usar cartão de crédito e conta bancária simultaneamente",
-    path: [ "creditCardId" ],
   });
 
 export type TransactionSchemaData = z.output<typeof TransactionSchema>;
