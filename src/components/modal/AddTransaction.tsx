@@ -63,6 +63,7 @@ export default function AddTransaction ({ groupId, isOpen, onClose, onSuccess }:
       transactionDate: new Date(),
       groupId,
       isPaid: false,
+      status: "PAID",
     },
   });
 
@@ -129,6 +130,9 @@ export default function AddTransaction ({ groupId, isOpen, onClose, onSuccess }:
   const selectedPaymentMethod = paymentMethods.find((pm) => pm.id === Number(selectedPaymentMethodId));
   const needsBankAccount = selectedPaymentMethod?.type === "DEBIT_CARD" || selectedPaymentMethod?.type === "BANK_TRANSFER";
   const needsCreditCard = selectedPaymentMethod?.type === "CREDIT_CARD";
+
+  // Para RECEITAS, sempre mostrar seleção de conta bancária (opcional mas recomendado)
+  const showBankAccountForIncome = selectedType === "INCOME";
 
   const onSubmit: SubmitHandler<TransactionSchemaData> = async (data) => {
     try {
@@ -280,6 +284,7 @@ export default function AddTransaction ({ groupId, isOpen, onClose, onSuccess }:
           </label>
           <select
             className="w-full px-3 py-2.5 rounded-xl bg-[#F0F0F3] text-[#4a4a4a] shadow-[inset_3px_3px_6px_rgba(174,174,192,0.15),inset_-3px_-3px_6px_rgba(255,255,255,0.7)] focus:shadow-[inset_4px_4px_8px_rgba(174,174,192,0.2),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] focus:outline-none transition-shadow text-sm"
+            defaultValue={"PAID"}
             {...register("status")}
           >
             <option value="PENDING">Pendente</option>
@@ -340,11 +345,11 @@ export default function AddTransaction ({ groupId, isOpen, onClose, onSuccess }:
         </div>
 
         {/* Conta Bancária (condicional - apenas para débito e transferência) */}
-        {needsBankAccount &&
+        {(needsBankAccount || showBankAccountForIncome) &&
           <div>
             <label className="block text-[#4a4a4a] text-sm font-semibold mb-2">
               <Building2 size={16} className="inline mr-1 mb-0.5" />
-              Conta Bancária
+              Conta Bancária {showBankAccountForIncome && <span className="text-xs text-[#6a6a6a]">(Recomendado)</span>}
             </label>
             <select
               className="w-full px-3 py-2.5 rounded-xl bg-[#F0F0F3] text-[#4a4a4a] shadow-[inset_3px_3px_6px_rgba(174,174,192,0.15),inset_-3px_-3px_6px_rgba(255,255,255,0.7)] focus:shadow-[inset_4px_4px_8px_rgba(174,174,192,0.2),inset_-4px_-4px_8px_rgba(255,255,255,0.8)] focus:outline-none transition-shadow text-sm"
@@ -353,6 +358,11 @@ export default function AddTransaction ({ groupId, isOpen, onClose, onSuccess }:
               <option value="">Selecione...</option>
               {bankAccounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.name} - {acc.bank}</option>)}
             </select>
+            {showBankAccountForIncome &&
+              <p className="mt-1 text-xs text-[#6a6a6a]">
+                💡 Selecione uma conta para atualizar o saldo automaticamente
+              </p>
+            }
           </div>
         }
 

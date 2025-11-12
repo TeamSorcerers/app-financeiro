@@ -137,6 +137,117 @@ async function createMirroredPersonalTransaction (
   logger.info(`Transação espelhada criada no grupo pessoal ${personalGroup.name} (ID: ${personalGroup.id}) para usuário ${userId}. Transação ID: ${mirroredTransaction.id}, Valor: ${mirroredTransaction.amount}, Status: ${mirroredTransaction.status}, isPaid: ${mirroredTransaction.isPaid}`);
 }
 
+async function validateCategory (categoryId: number | undefined) {
+  if (!categoryId) {
+    return null;
+  }
+
+  const category = await prisma.financialCategory.findUnique({ where: { id: categoryId } });
+
+  if (!category) {
+    return { error: "Categoria não encontrada" };
+  }
+
+  return null;
+}
+
+async function validateCreditCardLimit (creditCardId: number, amount: number, type: string) {
+  if (type !== "EXPENSE") {
+    return null;
+  }
+
+  const creditCard = await prisma.creditCard.findUnique({
+    where: { id: creditCardId },
+    include: {
+      transactions: {
+        where: {
+          type: "EXPENSE",
+          status: { "in": [ "PENDING", "PAID" ] },
+        },
+      },
+    },
+  });
+
+  if (!creditCard) {
+    return { error: "Cartão de crédito não encontrado", status: 404 };
+  }
+
+  if (creditCard.type !== "CREDIT" && creditCard.type !== "BOTH") {
+    return null;
+  }
+
+  const usedAmount = creditCard.transactions.reduce((sum, t) => sum + t.amount, 0);
+  const availableLimit = (creditCard.creditLimit || 0) - usedAmount;
+
+  if (amount > availableLimit) {
+    return {
+      error: "Limite do cartão insuficiente",
+      status: 400,
+      details: {
+        cardName: creditCard.name,
+        creditLimit: creditCard.creditLimit,
+        usedAmount,
+        availableLimit,
+        requiredAmount: amount,
+      },
+    };
+  }
+
+  return null;
+}
+
+async function validateBankAccountBalance (
+  bankAccountId: number,
+  amount: number,
+  type: string,
+  transactionStatus: string | undefined,
+  isPaid: boolean | undefined,
+) {
+  if (type !== "EXPENSE" || (!isPaid && transactionStatus !== "PAID")) {
+    return null;
+  }
+
+  const bankAccount = await prisma.bankAccount.findUnique({ where: { id: bankAccountId } });
+
+  if (!bankAccount) {
+    return { error: "Conta bancária não encontrada", status: 404 };
+  }
+
+  if (bankAccount.balance < amount) {
+    return {
+      error: "Saldo insuficiente na conta bancária",
+      status: 400,
+      details: {
+        accountName: bankAccount.name,
+        currentBalance: bankAccount.balance,
+        requiredAmount: amount,
+      },
+    };
+  }
+
+  return null;
+}
+
+async function updateBankAccountBalance (
+  bankAccountId: number,
+  amount: number,
+  type: string,
+  isPaid: boolean,
+  creditCardId: number | undefined,
+) {
+  // Cartão de crédito usa limite, não saldo da conta
+  if (!isPaid || creditCardId) {
+    return;
+  }
+
+  await prisma.bankAccount.update({
+    where: { id: bankAccountId },
+    data: { balance: { [type === "INCOME" ? "increment" : "decrement"]: amount } },
+  });
+
+  logger.info(`Saldo da conta bancária ${bankAccountId} atualizado: ${type === "INCOME" ? "+" : "-"}${amount}`);
+}
+
 export async function POST (request: NextRequest) {
   try {
     const session = await auth();
@@ -155,7 +266,7 @@ export async function POST (request: NextRequest) {
       }, { status: 400 });
     }
 
-    const { groupId, creditCardId, dueDate } = data;
+    const { groupId, creditCardId, dueDate, bankAccountId } = data;
 
     const group = await prisma.financialGroup.findFirst({
       where: {
@@ -168,50 +279,40 @@ export async function POST (request: NextRequest) {
       return Response.json({ error: "Grupo não encontrado" }, { status: 404 });
     }
 
-    // Verificar se a categoria existe (se fornecida)
-    if (data.categoryId) {
-      const category = await prisma.financialCategory.findUnique({ where: { id: data.categoryId } });
+    // Validar categoria
+    const categoryError = await validateCategory(data.categoryId);
 
-      if (!category) {
-        return Response.json({ error: "Categoria não encontrada" }, { status: 404 });
+    if (categoryError) {
+      return Response.json(categoryError, { status: 404 });
+    }
+
+    // Validar limite do cartão de crédito
+    if (creditCardId) {
+      const cardError = await validateCreditCardLimit(creditCardId, data.amount, data.type);
+
+      if (cardError) {
+        return Response.json({
+          error: cardError.error,
+          details: cardError.details,
+        }, { status: cardError.status });
       }
     }
 
-    // Validar limite do cartão de crédito se for despesa
-    if (creditCardId && data.type === "EXPENSE") {
-      const creditCard = await prisma.creditCard.findUnique({
-        where: { id: creditCardId },
-        include: {
-          transactions: {
-            where: {
-              type: "EXPENSE",
-              status: { "in": [ "PENDING", "PAID" ] },
-            },
-          },
-        },
-      });
+    // Validar saldo da conta bancária
+    if (bankAccountId) {
+      const accountError = await validateBankAccountBalance(
+        bankAccountId,
+        data.amount,
+        data.type,
+        data.status,
+        data.isPaid,
+      );
 
-      if (!creditCard) {
-        return Response.json({ error: "Cartão de crédito não encontrado" }, { status: 404 });
-      }
-
-      if (creditCard.type === "CREDIT" || creditCard.type === "BOTH") {
-        // Calcular saldo usado no cartão
-        const usedAmount = creditCard.transactions.reduce((sum, t) => sum + t.amount, 0);
-        const availableLimit = (creditCard.creditLimit || 0) - usedAmount;
-
-        if (data.amount > availableLimit) {
-          return Response.json({
-            error: "Limite do cartão insuficiente",
-            details: {
-              cardName: creditCard.name,
-              creditLimit: creditCard.creditLimit,
-              usedAmount,
-              availableLimit,
-              requiredAmount: data.amount,
-            },
-          }, { status: 400 });
-        }
+      if (accountError) {
+        return Response.json({
+          error: accountError.error,
+          details: accountError.details,
+        }, { status: accountError.status });
       }
     }
 
@@ -267,6 +368,11 @@ export async function POST (request: NextRequest) {
         creditCard: true,
       },
     });
+
+    // Atualizar saldo da conta bancária
+    if (bankAccountId) {
+      await updateBankAccountBalance(bankAccountId, data.amount, data.type, initialIsPaid, creditCardId);
+    }
 
     // Criar transação espelhada se for despesa em grupo colaborativo
     if (data.type === "EXPENSE" && group.type === "COLLABORATIVE") {
