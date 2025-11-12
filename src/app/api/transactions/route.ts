@@ -41,6 +41,96 @@ export async function GET () {
   }
 }
 
+async function calculateCreditCardDueDate (creditCardId: number, transactionDate: Date) {
+  const creditCard = await prisma.creditCard.findUnique({
+    where: { id: creditCardId },
+    select: { dueDay: true, closingDay: true },
+  });
+
+  if (!creditCard?.dueDay) {
+    return null;
+  }
+
+  const currentMonth = transactionDate.getMonth();
+  const currentYear = transactionDate.getFullYear();
+  const isAfterClosing = creditCard.closingDay ? transactionDate.getDate() > creditCard.closingDay : false;
+  const dueMonth = isAfterClosing ? currentMonth + 1 : currentMonth;
+
+  return new Date(currentYear, dueMonth, creditCard.dueDay);
+}
+
+function determineInitialTransactionStatus (
+  statusInput: string | undefined,
+  isPaidInput: boolean | undefined,
+  type: string,
+  creditCardId: number | undefined,
+) {
+  let initialStatus = statusInput || "PENDING";
+  let initialIsPaid = isPaidInput || statusInput === "PAID";
+
+  // Se for receita e não for cartão de crédito, marcar como pago automaticamente
+  if (type === "INCOME" && !creditCardId) {
+    initialStatus = "PAID";
+    initialIsPaid = true;
+  }
+
+  return {
+    initialStatus: initialStatus as "PENDING" | "PAID" | "OVERDUE" | "CANCELLED" | "PARTIALLY_PAID",
+    initialIsPaid,
+  };
+}
+
+async function createMirroredPersonalTransaction (
+  data: {
+    amount: number;
+    status: "PENDING" | "PAID" | "OVERDUE" | "CANCELLED" | "PARTIALLY_PAID";
+    description?: string;
+    transactionDate: Date;
+    dueDate: Date | null;
+    isPaid: boolean;
+    categoryId?: number;
+    creditCardId?: number;
+    bankAccountId?: number;
+    paymentMethodId?: number;
+  },
+  groupName: string,
+  userId: number,
+) {
+  const personalGroup = await prisma.financialGroup.findFirst({
+    where: {
+      type: "PERSONAL",
+      members: { some: { userId, isOwner: true } },
+    },
+  });
+
+  if (!personalGroup) {
+    return;
+  }
+
+  const paidAt = data.isPaid ? new Date() : null;
+
+  await prisma.transaction.create({
+    data: {
+      amount: data.amount,
+      type: "EXPENSE",
+      status: data.status,
+      description: `[${groupName}] ${data.description || "Despesa compartilhada"}`,
+      transactionDate: data.transactionDate,
+      dueDate: data.dueDate,
+      paidAt,
+      isPaid: data.isPaid,
+      categoryId: data.categoryId,
+      createdById: userId,
+      groupId: personalGroup.id,
+      creditCardId: data.creditCardId,
+      bankAccountId: data.bankAccountId,
+      paymentMethodId: data.paymentMethodId,
+    },
+  });
+
+  logger.info(`Transação espelhada criada no grupo pessoal para usuário ${userId}`);
+}
+
 export async function POST (request: NextRequest) {
   try {
     const session = await auth();
@@ -81,37 +171,22 @@ export async function POST (request: NextRequest) {
       }
     }
 
-    // Calcular data de vencimento automaticamente se for cartão de crédito
-    let calculatedDueDate = dueDate ? new Date(dueDate) : null;
+    // Calcular data de vencimento
+    let calculatedDueDate: Date | null = null;
 
-    if (creditCardId && !calculatedDueDate) {
-      const creditCard = await prisma.creditCard.findUnique({
-        where: { id: creditCardId },
-        select: { dueDay: true, closingDay: true },
-      });
-
-      if (creditCard && creditCard.dueDay) {
-        const transactionDate = new Date(data.transactionDate);
-        const currentMonth = transactionDate.getMonth();
-        const currentYear = transactionDate.getFullYear();
-
-        // Se a transação foi depois do fechamento, vencimento será no próximo mês
-        const isAfterClosing = creditCard.closingDay ? transactionDate.getDate() > creditCard.closingDay : false;
-        const dueMonth = isAfterClosing ? currentMonth + 1 : currentMonth;
-
-        calculatedDueDate = new Date(currentYear, dueMonth, creditCard.dueDay);
-      }
+    if (dueDate) {
+      calculatedDueDate = new Date(dueDate);
+    } else if (creditCardId) {
+      calculatedDueDate = await calculateCreditCardDueDate(creditCardId, new Date(data.transactionDate));
     }
 
-    // Determinar status inicial baseado no tipo e método de pagamento
-    let initialStatus = data.status || "PENDING";
-    let initialIsPaid = data.isPaid || data.status === "PAID";
-
-    // Se for receita e não for cartão de crédito, marcar como pago automaticamente
-    if (data.type === "INCOME" && !creditCardId) {
-      initialStatus = "PAID";
-      initialIsPaid = true;
-    }
+    // Determinar status inicial
+    const { initialStatus, initialIsPaid } = determineInitialTransactionStatus(
+      data.status,
+      data.isPaid,
+      data.type,
+      creditCardId,
+    );
 
     const transaction = await prisma.transaction.create({
       data: {
@@ -148,6 +223,26 @@ export async function POST (request: NextRequest) {
         creditCard: true,
       },
     });
+
+    // Criar transação espelhada se for despesa em grupo colaborativo
+    if (data.type === "EXPENSE" && group.type === "COLLABORATIVE") {
+      await createMirroredPersonalTransaction(
+        {
+          amount: data.amount,
+          status: initialStatus,
+          description: data.description,
+          transactionDate: new Date(data.transactionDate),
+          dueDate: calculatedDueDate,
+          isPaid: initialIsPaid,
+          categoryId: data.categoryId,
+          creditCardId: data.creditCardId,
+          bankAccountId: data.bankAccountId,
+          paymentMethodId: data.paymentMethodId,
+        },
+        group.name,
+        session.user.userId,
+      );
+    }
 
     logger.info(`Transação criada com sucesso para usuário ${session.user.userId}`);
 
