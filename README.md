@@ -1,5 +1,13 @@
 # 💰 App Financeiro - Ferramenta de Despesas Colaborativa
 
+<div align="center">
+  
+<img src="./access-qrcode.jpg" alt="" width="200px">
+
+**📱 Escaneie o QR Code acima para acessar rapidamente**
+
+</div>
+
 Uma aplicação moderna para controle de despesas pessoais e colaborativas, desenvolvida como projeto universitário. A ferramenta permite que amigos e familiares compartilhem e atualizem suas finanças em tempo real.
 
 ## 🚀 Visão do Projeto
