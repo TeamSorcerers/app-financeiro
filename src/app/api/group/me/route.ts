@@ -29,6 +29,8 @@ export async function GET () {
           type: true,
           isPaid: true,
           description: true,
+          creditCardId: true,
+          bankAccountId: true,
         },
       },
     },
@@ -38,10 +40,16 @@ export async function GET () {
     return Response.json({ error: "Grupo pessoal não encontrado" }, { status: HTTP_STATUS.NOT_FOUND });
   }
 
-  // Calcular saldo considerando APENAS transações pagas para saldo real
-  const saldo = group.transactions.reduce((acc, t) => {
+  // Calcular saldo das transações (apenas as que NÃO têm cartão/banco vinculado)
+  const transactionBalance = group.transactions.reduce((acc, t) => {
     // Pular transações não pagas no cálculo do saldo real
     if (!t.isPaid) {
+      return acc;
+    }
+
+    // Pular transações vinculadas a cartão de crédito ou conta bancária
+    // Essas já estão refletidas no saldo da conta/limite do cartão
+    if (t.creditCardId || t.bankAccountId) {
       return acc;
     }
 
@@ -55,7 +63,41 @@ export async function GET () {
     return acc;
   }, 0);
 
-  logger.info(`Saldo calculado para grupo pessoal ${group.name} (ID: ${group.id}): ${saldo}. Total de transações: ${group.transactions.length}`);
+  // Buscar saldo das contas bancárias do usuário
+  const bankAccounts = await prisma.bankAccount.findMany({
+    where: {
+      userId: session.user.userId,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      balance: true,
+    },
+  });
+
+  // Calcular saldo total das contas bancárias
+  const bankBalance = bankAccounts.reduce((sum, account) => sum + account.balance, 0);
+
+  // Buscar transações vinculadas às contas bancárias (apenas as pagas e sem cartão de crédito)
+  const bankTransactions = await prisma.transaction.findMany({
+    where: {
+      bankAccountId: { "in": bankAccounts.map((acc) => acc.id) },
+      isPaid: true,
+      creditCardId: null, // Excluir transações de cartão de crédito
+    },
+    select: {
+      amount: true,
+      type: true,
+    },
+  });
+
+  // Calcular impacto das transações nas contas bancárias
+  const bankTransactionBalance = bankTransactions.reduce((sum, t) => sum + (t.type === "INCOME" ? t.amount : -t.amount), 0);
+
+  // Saldo total = transações em dinheiro + saldo inicial das contas + transações das contas
+  const saldo = transactionBalance + bankBalance + bankTransactionBalance;
+
+  logger.info(`Saldo calculado para grupo pessoal ${group.name} (ID: ${group.id}): Transações: ${transactionBalance}, Contas: ${bankBalance}, Transações das contas: ${bankTransactionBalance}, Total: ${saldo}`);
 
   return Response.json({
     data: {
