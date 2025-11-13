@@ -143,17 +143,23 @@ export async function GET () {
       };
     });
 
+    const availableCreditLimit = totalCreditLimit - totalCreditDebt;
+
     // Saldo líquido real considerando dívidas do cartão
     const realNetBalance = totalBalance + totalBankBalance - totalCreditDebt;
+
+    // Saldo total disponível (incluindo crédito)
+    const totalAvailableBalance = totalBalance + totalBankBalance + availableCreditLimit;
 
     return Response.json({
       totalBalance, // Saldo dos grupos (transações SEM cartão/banco)
       totalBankBalance, // Saldo real das contas bancárias
       totalCreditDebt, // Total de dívidas nos cartões
       totalCreditLimit, // Limite total de crédito
-      availableCreditLimit: totalCreditLimit - totalCreditDebt,
-      consolidatedBalance: totalBalance + totalBankBalance, // Saldo sem considerar cartão
-      realNetBalance, // Saldo real líquido (considerando dívidas do cartão)
+      availableCreditLimit, // Limite de crédito disponível
+      consolidatedBalance: totalBalance + totalBankBalance, // Saldo em dinheiro
+      realNetBalance, // Saldo real líquido (descontando dívidas)
+      totalAvailableBalance, // Saldo total disponível (dinheiro + crédito)
       balanceByGroup,
       bankAccounts: bankAccountsWithRealBalance,
       creditCards: creditCardSummary,

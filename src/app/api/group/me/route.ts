@@ -94,17 +94,65 @@ export async function GET () {
   // Calcular impacto das transações nas contas bancárias
   const bankTransactionBalance = bankTransactions.reduce((sum, t) => sum + (t.type === "INCOME" ? t.amount : -t.amount), 0);
 
-  // Saldo total = transações em dinheiro + saldo inicial das contas + transações das contas
-  const saldo = transactionBalance + bankBalance + bankTransactionBalance;
+  // Buscar cartões de crédito do usuário
+  const creditCards = await prisma.creditCard.findMany({
+    where: {
+      userId: session.user.userId,
+      isActive: true,
+      type: { "in": [ "CREDIT", "BOTH" ] },
+    },
+    include: {
+      transactions: {
+        where: {
+          type: "EXPENSE",
+          status: { "in": [ "PENDING", "PAID" ] },
+        },
+      },
+    },
+  });
 
-  logger.info(`Saldo calculado para grupo pessoal ${group.name} (ID: ${group.id}): Transações: ${transactionBalance}, Contas: ${bankBalance}, Transações das contas: ${bankTransactionBalance}, Total: ${saldo}`);
+  // Calcular limite total disponível nos cartões de crédito
+  let totalCreditLimit = 0;
+  let totalCreditUsed = 0;
+  const creditCardsSummary = creditCards.map((card) => {
+    const usedAmount = card.transactions.reduce((sum, t) => sum + t.amount, 0);
+    const availableLimit = (card.creditLimit || 0) - usedAmount;
+
+    totalCreditLimit += card.creditLimit || 0;
+    totalCreditUsed += usedAmount;
+
+    return {
+      id: card.id,
+      name: card.name,
+      last4Digits: card.last4Digits,
+      brand: card.brand,
+      creditLimit: card.creditLimit,
+      usedAmount,
+      availableLimit: Math.max(0, availableLimit),
+    };
+  });
+
+  const availableCreditLimit = totalCreditLimit - totalCreditUsed;
+
+  // Saldo total = transações em dinheiro + saldo das contas + transações das contas + limite de crédito disponível
+  const cashBalance = transactionBalance + bankBalance + bankTransactionBalance;
+  const totalBalance = cashBalance + availableCreditLimit;
+
+  logger.info(`Saldo calculado para grupo pessoal ${group.name} (ID: ${group.id}): Dinheiro: ${cashBalance}, Crédito disponível: ${availableCreditLimit}, Total: ${totalBalance}`);
 
   return Response.json({
     data: {
       id: group.id,
       name: group.name,
       description: group.description,
-      balance: saldo,
+      balance: totalBalance,
+      breakdown: {
+        cashBalance, // Dinheiro + contas bancárias
+        availableCreditLimit, // Limite de crédito disponível
+        totalCreditLimit, // Limite total de crédito
+        totalCreditUsed, // Total usado nos cartões
+      },
+      creditCards: creditCardsSummary,
     },
   });
 }
