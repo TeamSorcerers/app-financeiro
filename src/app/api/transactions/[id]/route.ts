@@ -4,6 +4,81 @@ import { prisma } from "@/lib/shared/prisma";
 import { RouteParams } from "@/lib/shared/types";
 import { NextRequest } from "next/server";
 
+function checkUserPermission (
+  transaction: { createdById: number; group: { members: { userId: number; isOwner: boolean }[] } },
+  userId: number,
+) {
+  const isCreator = transaction.createdById === userId;
+  const isGroupAdmin = transaction.group.members.some(
+    (m) => m.userId === userId && m.isOwner,
+  );
+
+  return isCreator || isGroupAdmin;
+}
+
+function determineBalanceOperation (isPaid: boolean, transactionType: string) {
+  if (isPaid) {
+    return transactionType === "INCOME" ? "increment" : "decrement";
+  }
+
+  return transactionType === "INCOME" ? "decrement" : "increment";
+}
+
+async function handleBankBalanceUpdate (
+  existingTransaction: {
+    bankAccountId: number | null;
+    creditCard: { type: string } | null;
+  },
+  transaction: { isPaid: boolean; type: string; amount: number },
+  shouldUpdate: boolean,
+) {
+  if (!shouldUpdate || !existingTransaction.bankAccountId) {
+    return;
+  }
+
+  const isCredit = existingTransaction.creditCard?.type === "CREDIT";
+
+  if (isCredit) {
+    return;
+  }
+
+  const operation = determineBalanceOperation(transaction.isPaid, transaction.type);
+
+  await prisma.bankAccount.update({
+    where: { id: existingTransaction.bankAccountId },
+    data: { balance: { [operation]: transaction.amount } },
+  });
+
+  logger.info(`Saldo da conta bancária ${existingTransaction.bankAccountId} atualizado após mudança de status`);
+}
+
+function processStatusUpdate (
+  body: { status?: string },
+  updateData: Record<string, unknown>,
+  wasAlreadyPaid: boolean,
+) {
+  if (body.status === undefined) {
+    return false;
+  }
+
+  updateData.status = body.status;
+  let shouldUpdateBalance = false;
+
+  if (body.status === "PAID") {
+    updateData.isPaid = true;
+    updateData.paidAt = new Date();
+    shouldUpdateBalance = !wasAlreadyPaid;
+  } else if ([ "PENDING", "OVERDUE", "CANCELLED" ].includes(body.status)) {
+    updateData.isPaid = false;
+    updateData.paidAt = null;
+    shouldUpdateBalance = wasAlreadyPaid;
+  } else if (body.status === "PARTIALLY_PAID") {
+    updateData.isPaid = false;
+  }
+
+  return shouldUpdateBalance;
+}
+
 export async function GET (
   request: NextRequest,
   { params }: RouteParams<{ id: string }>,
@@ -75,43 +150,32 @@ export async function PUT (
     // Verificar se a transação existe
     const existingTransaction = await prisma.transaction.findUnique({
       where: { id: transactionId },
-      include: { group: { include: { members: true } } },
+      include: {
+        group: { include: { members: true } },
+        creditCard: { select: { type: true } },
+      },
     });
 
     if (!existingTransaction) {
       return Response.json({ error: "Transação não encontrada" }, { status: 404 });
     }
 
-    // Verificar se o usuário é o criador OU é admin do grupo
-    const isCreator = existingTransaction.createdById === session.user.userId;
-    const isGroupAdmin = existingTransaction.group.members.some(
-      (m) => m.userId === session.user.userId && m.isOwner,
-    );
+    // Verificar permissões
+    const hasPermission = await checkUserPermission(existingTransaction, session.user.userId);
 
-    if (!isCreator && !isGroupAdmin) {
+    if (!hasPermission) {
       return Response.json({ error: "Sem permissão para editar esta transação" }, { status: 403 });
     }
 
     const body = await request.json();
-    // Permitir atualização direta de campos específicos sem validação completa do schema
     const updateData: Record<string, unknown> = {};
 
-    // Campos permitidos para atualização rápida
-    if (body.status !== undefined) {
-      updateData.status = body.status;
-
-      // Sincronizar isPaid com status
-      if (body.status === "PAID") {
-        updateData.isPaid = true;
-        updateData.paidAt = new Date();
-      } else if ([ "PENDING", "OVERDUE", "CANCELLED" ].includes(body.status)) {
-        updateData.isPaid = false;
-        updateData.paidAt = null;
-      } else if (body.status === "PARTIALLY_PAID") {
-        updateData.isPaid = false;
-        // Mantém paidAt se já existir
-      }
-    }
+    // Processar atualização de status
+    const shouldUpdateBankBalance = processStatusUpdate(
+      body,
+      updateData,
+      existingTransaction.isPaid,
+    );
 
     if (body.categoryId !== undefined) {
       updateData.categoryId = body.categoryId === "" ? null : body.categoryId;
@@ -133,6 +197,9 @@ export async function PUT (
       },
     });
 
+    // Atualizar saldo da conta bancária se necessário
+    await handleBankBalanceUpdate(existingTransaction, transaction, shouldUpdateBankBalance);
+
     logger.info(`Transação atualizada com sucesso com id: ${id} para usuário ${session.user.userId}`);
 
     return Response.json({
@@ -144,6 +211,35 @@ export async function PUT (
 
     return Response.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
+}
+
+async function revertBankBalance (
+  existingTransaction: {
+    isPaid: boolean;
+    bankAccountId: number | null;
+    creditCard: { type: string } | null;
+    type: string;
+    amount: number;
+  },
+) {
+  if (!existingTransaction.isPaid || !existingTransaction.bankAccountId) {
+    return;
+  }
+
+  const isCredit = existingTransaction.creditCard?.type === "CREDIT";
+
+  if (isCredit) {
+    return;
+  }
+
+  const operation = existingTransaction.type === "INCOME" ? "decrement" : "increment";
+
+  await prisma.bankAccount.update({
+    where: { id: existingTransaction.bankAccountId },
+    data: { balance: { [operation]: existingTransaction.amount } },
+  });
+
+  logger.info(`Saldo da conta bancária ${existingTransaction.bankAccountId} revertido após exclusão`);
 }
 
 export async function DELETE (
@@ -167,22 +263,25 @@ export async function DELETE (
     // Verificar se a transação existe
     const existingTransaction = await prisma.transaction.findUnique({
       where: { id: transactionId },
-      include: { group: { include: { members: true } } },
+      include: {
+        group: { include: { members: true } },
+        creditCard: { select: { type: true } },
+      },
     });
 
     if (!existingTransaction) {
       return Response.json({ error: "Transação não encontrada" }, { status: 404 });
     }
 
-    // Verificar se o usuário é o criador OU é admin do grupo
-    const isCreator = existingTransaction.createdById === session.user.userId;
-    const isGroupAdmin = existingTransaction.group.members.some(
-      (m) => m.userId === session.user.userId && m.isOwner,
-    );
+    // Verificar permissões
+    const hasPermission = await checkUserPermission(existingTransaction, session.user.userId);
 
-    if (!isCreator && !isGroupAdmin) {
+    if (!hasPermission) {
       return Response.json({ error: "Sem permissão para excluir esta transação" }, { status: 403 });
     }
+
+    // Reverter saldo da conta bancária se necessário
+    await revertBankBalance(existingTransaction);
 
     await prisma.transaction.delete({ where: { id: transactionId } });
 

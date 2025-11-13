@@ -202,9 +202,24 @@ async function validateBankAccountBalance (
   type: string,
   transactionStatus: string | undefined,
   isPaid: boolean | undefined,
+  creditCardId: number | undefined,
 ) {
+  // Apenas validar saldo se for despesa E estiver paga E não for cartão de crédito
   if (type !== "EXPENSE" || (!isPaid && transactionStatus !== "PAID")) {
     return null;
+  }
+
+  // Se tiver cartão de crédito vinculado, verificar se é débito
+  if (creditCardId) {
+    const creditCard = await prisma.creditCard.findUnique({
+      where: { id: creditCardId },
+      select: { type: true },
+    });
+
+    // Se for cartão de crédito puro, não validar saldo da conta
+    if (creditCard?.type === "CREDIT") {
+      return null;
+    }
   }
 
   const bankAccount = await prisma.bankAccount.findUnique({ where: { id: bankAccountId } });
@@ -235,9 +250,29 @@ async function updateBankAccountBalance (
   isPaid: boolean,
   creditCardId: number | undefined,
 ) {
-  // Cartão de crédito usa limite, não saldo da conta
-  if (!isPaid || creditCardId) {
+  // Não atualizar se não estiver pago
+  if (!isPaid) {
+    logger.info(`Transação não paga - saldo da conta ${bankAccountId} não será atualizado`);
+
     return;
+  }
+
+  // Se tiver cartão vinculado, verificar o tipo
+  if (creditCardId) {
+    const creditCard = await prisma.creditCard.findUnique({
+      where: { id: creditCardId },
+      select: { type: true, name: true },
+    });
+
+    // Se for cartão de crédito, não atualizar saldo da conta bancária
+    if (creditCard?.type === "CREDIT") {
+      logger.info(`Transação com cartão de crédito ${creditCard.name} - saldo da conta não será atualizado`);
+
+      return;
+    }
+
+    // Se for DEBIT ou BOTH, atualizar o saldo da conta
+    logger.info(`Transação com cartão ${creditCard?.type === "DEBIT" ? "de débito" : "misto"} - atualizando saldo da conta ${bankAccountId}`);
   }
 
   await prisma.bankAccount.update({
@@ -306,6 +341,7 @@ export async function POST (request: NextRequest) {
         data.type,
         data.status,
         data.isPaid,
+        creditCardId,
       );
 
       if (accountError) {
@@ -369,7 +405,7 @@ export async function POST (request: NextRequest) {
       },
     });
 
-    // Atualizar saldo da conta bancária
+    // Atualizar saldo da conta bancária (se aplicável)
     if (bankAccountId) {
       await updateBankAccountBalance(bankAccountId, data.amount, data.type, initialIsPaid, creditCardId);
     }

@@ -37,10 +37,11 @@ export async function GET () {
     for (const group of allGroups) {
       let groupBalance = 0;
 
-      // Calcular saldo do grupo (apenas transações pagas)
+      // Calcular saldo do grupo (apenas transações pagas e SEM cartão/banco vinculado)
       for (const transaction of group.transactions) {
-        // Filtrar apenas transações pagas para cálculo do saldo real
-        if (transaction.isPaid) {
+        // Filtrar apenas transações pagas e que não usam cartão de crédito ou conta bancária
+        // Essas transações já impactam o saldo do cartão/banco, não do saldo do grupo
+        if (transaction.isPaid && !transaction.creditCardId && !transaction.bankAccountId) {
           if (transaction.type === "INCOME") {
             groupBalance += transaction.amount;
           } else if (transaction.type === "EXPENSE") {
@@ -59,7 +60,7 @@ export async function GET () {
       });
     }
 
-    // Buscar saldos das contas bancárias do usuário
+    // Buscar saldos das contas bancárias do usuário com transações
     const bankAccounts = await prisma.bankAccount.findMany({
       where: {
         userId,
@@ -73,7 +74,27 @@ export async function GET () {
       },
     });
 
-    const totalBankBalance = bankAccounts.reduce((sum: number, account: { balance: number }) => sum + account.balance, 0);
+    // Calcular saldo real das contas considerando transações vinculadas
+    const bankAccountsWithRealBalance = await Promise.all(
+      bankAccounts.map(async (account) => {
+        const transactions = await prisma.transaction.findMany({
+          where: {
+            bankAccountId: account.id,
+            isPaid: true,
+            creditCardId: null, // Excluir transações de cartão de crédito
+          },
+        });
+
+        const transactionBalance = transactions.reduce((sum, t) => sum + (t.type === "INCOME" ? t.amount : -t.amount), 0);
+
+        return {
+          ...account,
+          realBalance: account.balance + transactionBalance,
+        };
+      }),
+    );
+
+    const totalBankBalance = bankAccountsWithRealBalance.reduce((sum, account) => sum + account.realBalance, 0);
 
     // Buscar cartões de crédito e calcular gastos pendentes
     const DAYS_FOR_PENDING_TRANSACTIONS = 40;
@@ -93,6 +114,7 @@ export async function GET () {
         transactions: {
           where: {
             type: "EXPENSE",
+            status: { "in": [ "PENDING", "PAID" ] },
             // Considerar transações dos últimos 40 dias para capturar gastos pendentes
             transactionDate: { gte: new Date(Date.now() - (DAYS_FOR_PENDING_TRANSACTIONS * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MILLISECONDS_PER_SECOND)) },
           },
@@ -125,15 +147,15 @@ export async function GET () {
     const realNetBalance = totalBalance + totalBankBalance - totalCreditDebt;
 
     return Response.json({
-      totalBalance, // Saldo dos grupos (transações)
-      totalBankBalance, // Saldo das contas bancárias
+      totalBalance, // Saldo dos grupos (transações SEM cartão/banco)
+      totalBankBalance, // Saldo real das contas bancárias
       totalCreditDebt, // Total de dívidas nos cartões
       totalCreditLimit, // Limite total de crédito
       availableCreditLimit: totalCreditLimit - totalCreditDebt,
       consolidatedBalance: totalBalance + totalBankBalance, // Saldo sem considerar cartão
       realNetBalance, // Saldo real líquido (considerando dívidas do cartão)
       balanceByGroup,
-      bankAccounts,
+      bankAccounts: bankAccountsWithRealBalance,
       creditCards: creditCardSummary,
       summary: {
         totalGroups: allGroups.length,
